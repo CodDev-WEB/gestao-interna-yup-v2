@@ -6,7 +6,7 @@ Central de inteligência gerencial da **Yup Petstore**: estoque, vendas, validad
 Santarém Sistemas (API de consulta SQL, 20 req/min, até 100 linhas por página)
         │  POST /publica/api/consulta/sql/v1  {"sql": "SELECT …"}   (consultas fixas, só SELECT)
         ▼
-Cloudflare Worker  gestao-interna-yup   cron */5 · rotas /api/* (Bearer ADMIN_TOKEN)
+Cloudflare Worker  gestao-interna-yup-v2   cron */5 · rotas /api/* (Bearer ADMIN_TOKEN)
         ▼
 Supabase (Postgres)
   erp_*        espelho tipado das tabelas do ERP (25 jobs, 22 tabelas)
@@ -16,7 +16,7 @@ Supabase (Postgres)
 
 ## Site
 
-**https://gestao-interna-yup.jordano-19-silva.workers.dev** — login com e-mail e senha do Supabase Auth (perfil admin).
+**https://gestao-interna-yup-v2.jordano-19-silva.workers.dev** — login com e-mail e senha do Supabase Auth (perfil admin).
 
 | Tela | O que mostra |
 |---|---|
@@ -123,8 +123,13 @@ npm run gen:sql     # depois de mudar src/sync/datasets.ts
 cp .dev.vars.example .dev.vars && npm run dev
 ```
 
-Infra: Worker `https://gestao-interna-yup.jordano-19-silva.workers.dev` · Supabase `udrsdiuzztelysxiozpl` (us-west-2).
+Infra: Worker `https://gestao-interna-yup-v2.jordano-19-silva.workers.dev` · Supabase `udrsdiuzztelysxiozpl` (us-west-2).
 
 ## Reconstrução v2
 
-Esta versão foi reconstruída a partir do repositório `gestao-interna-yup`, preservando a arquitetura de integração com Santarém Sistemas, Cloudflare Workers e Supabase. A migração de código não executa alterações no banco de dados nem transfere segredos.
+Esta versão foi reconstruída a partir do repositório `gestao-interna-yup-v2`, preservando a arquitetura de integração com Santarém Sistemas, Cloudflare Workers e Supabase. A migração de código não executa alterações no banco de dados nem transfere segredos.
+
+
+## Publicação v2 isolada
+
+O Worker desta reconstrução usa o nome `gestao-interna-yup-v2` e não substitui o Worker legado. O pipeline interrompe a publicação se os dois secrets de deploy da Cloudflare não estiverem presentes no GitHub. Depois do primeiro deploy, configure no Worker v2 os secrets operacionais `ERP_TOKEN`, `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` (e opcionalmente `ADMIN_TOKEN`) antes de testar login e sincronização.
