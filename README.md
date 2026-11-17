@@ -124,3 +124,7 @@ cp .dev.vars.example .dev.vars && npm run dev
 ```
 
 Infra: Worker `https://gestao-interna-yup.jordano-19-silva.workers.dev` · Supabase `udrsdiuzztelysxiozpl` (us-west-2).
+
+## Reconstrução v2
+
+Esta versão foi reconstruída a partir do repositório `gestao-interna-yup`, preservando a arquitetura de integração com Santarém Sistemas, Cloudflare Workers e Supabase. A migração de código não executa alterações no banco de dados nem transfere segredos.
