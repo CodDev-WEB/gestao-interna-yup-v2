@@ -1,0 +1,6 @@
+# Copie para .dev.vars (não versionado) para rodar `npm run dev` localmente.
+ERP_TOKEN=
+SUPABASE_URL=https://SEU-PROJETO.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=
+# Opcional (automações). O acesso normal é login do Supabase Auth com perfil admin.
+ADMIN_TOKEN=
