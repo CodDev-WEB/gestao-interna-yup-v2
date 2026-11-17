@@ -121,7 +121,7 @@ export default {
     if (route === 'GET /api/health') {
       return json({
         ok: true,
-        service: 'gestao-interna-yup',
+        service: 'gestao-interna-yup-v2',
         configured: {
           erp: Boolean(env.ERP_TOKEN),
           supabase: Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY),
