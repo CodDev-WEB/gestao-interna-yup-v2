@@ -1,6 +1,7 @@
 import { type Page, useApi } from '../api'
 import { brl, data, dec, int, pct } from '../format'
 import { SETORES, SITUACOES, situacao } from '../labels'
+import { ItemLink } from '../ProdutoPainel'
 import { type Col, DataTable, Empty, ErrorState, Loading, PageHead, SearchBox, Tabs, useParam, useTableState } from '../ui'
 
 type Produto = {
@@ -23,7 +24,7 @@ function Lista() {
   const s = sit ? situacao(sit) : null
 
   const cols: Col<Produto>[] = [
-    { key: 'descricao', label: 'Produto', wrap: true, sort: true, render: r => <><span className="title">{r.descricao || `Variação ${r.idmercadoriavariacao}`}</span><small>{r.codigobarras || '—'} · {r.secao || 'sem seção'}</small></> },
+    { key: 'descricao', label: 'Produto', wrap: true, sort: true, render: r => <><ItemLink id={r.idmercadoriavariacao}>{r.descricao || `Variação ${r.idmercadoriavariacao}`}</ItemLink><small>{r.codigobarras || '—'} · {r.secao || 'sem seção'}</small></> },
     { key: 'situacao', label: 'Situação', render: r => { const x = situacao(r.situacao); return <span className="tag"><i style={{ background: x.cor }} aria-hidden />{x.nome}</span> } },
     { key: 'estoque_atual', label: 'Estoque', right: true, sort: true, render: r => dec(r.estoque_atual) },
     { key: 'valor_estoque', label: 'Valor (custo)', right: true, sort: true, className: 'money', render: r => brl(r.valor_estoque) },
@@ -63,7 +64,7 @@ function Declinio() {
   const t = useTableState('qtd_3_meses_atras')
   const { data: p, error, reload } = useApi<Page<Declinio>>(`dash/declinio?limit=${PAGE}&offset=${(t.page - 1) * PAGE}`)
   const cols: Col<Declinio>[] = [
-    { key: 'descricao', label: 'Produto', wrap: true, render: r => r.descricao || `Variação ${r.idmercadoriavariacao}` },
+    { key: 'descricao', label: 'Produto', wrap: true, render: r => <ItemLink id={r.idmercadoriavariacao}>{r.descricao || `Variação ${r.idmercadoriavariacao}`}</ItemLink> },
     { key: 'm3', label: 'Há 3 meses', right: true, render: r => dec(r.qtd_3_meses_atras) },
     { key: 'm2', label: 'Há 2 meses', right: true, render: r => dec(r.qtd_2_meses_atras) },
     { key: 'm1', label: 'Mês passado', right: true, render: r => dec(r.qtd_mes_passado) },

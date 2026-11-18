@@ -2,6 +2,7 @@
 // O navegador só envia filtros; cada filtro é validado contra uma lista fechada antes de virar consulta.
 
 import type { Supabase } from './supabase/client'
+import { produtoDetalhe } from './produto'
 
 export class DashError extends Error {}
 
@@ -142,6 +143,15 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
 
     case 'secoes':
       return db.select('vw_secao_setor', 'select=*&order=descricao.asc')
+
+    // Ficha completa de um item (painel que abre ao clicar no produto).
+    case 'produto': {
+      const id = q.get('id')
+      if (!id || !/^\d{1,12}$/.test(id)) throw new DashError('Informe o id da variação.')
+      const r = await produtoDetalhe(Number(id), db)
+      if (!r) throw new DashError('Item não encontrado.')
+      return r
+    }
   }
   throw new DashError('Consulta desconhecida.')
 }

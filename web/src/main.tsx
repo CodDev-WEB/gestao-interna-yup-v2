@@ -5,6 +5,7 @@ import { CalendarClock, ChevronRight, LayoutDashboard, LogOut, Package, RefreshC
 import './styles.css'
 import { currentUser, logout, onAuthChange } from './api'
 import { Brand } from './ui'
+import ProdutoPainel from './ProdutoPainel'
 import Login from './pages/Login'
 import Resumo from './pages/Resumo'
 import Produtos from './pages/Produtos'
@@ -55,6 +56,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <ProdutoPainel />
     </div>
   )
 }

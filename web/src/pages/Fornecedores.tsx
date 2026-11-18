@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { type Page, useApi } from '../api'
 import { brl, data, int, pct } from '../format'
 import { X } from 'lucide-react'
+import { ItemLink } from '../ProdutoPainel'
 import { type Col, DataTable, Empty, ErrorState, Loading, PageHead, SearchBox, Tabs, useParam, useTableState } from '../ui'
 
 type Forn = { idfornecedor: number; nome: string | null; total_comprado: number | string; compras: number; ticket_medio: number | string; skus: number; primeira_compra: string; ultima_compra: string; participacao_pct: number | string }
@@ -42,7 +43,7 @@ function Precos() {
   if (min) qs.set('min', min); if (forn) qs.set('fornecedor', forn)
   const { data: p, error, reload } = useApi<Page<Preco>>(`dash/precos?${qs}`)
   const cols: Col<Preco>[] = [
-    { key: 'descricao', label: 'Item', wrap: true, render: x => <><span className="title">{x.descricao || `Variação ${x.idmercadoriavariacao}`}</span><small>Fornecedor {x.idfornecedor} · {int(x.compras)} compras</small></> },
+    { key: 'descricao', label: 'Item', wrap: true, render: x => <><ItemLink id={x.idmercadoriavariacao}>{x.descricao || `Variação ${x.idmercadoriavariacao}`}</ItemLink><small>Fornecedor {x.idfornecedor} · {int(x.compras)} compras</small></> },
     { key: 'penultimo', label: 'Penúltimo preço', right: true, render: x => brl(x.penultimo_preco) },
     { key: 'ultimo_preco', label: 'Último preço', right: true, sort: true, render: x => brl(x.ultimo_preco) },
     { key: 'variacao_ultima_pct', label: 'Variação', right: true, sort: true, render: x => { const v = Number(x.variacao_ultima_pct); return x.variacao_ultima_pct === null ? '—' : <span className={v > 0 ? 'down' : v < 0 ? 'up' : ''}>{v > 0 ? '▲ ' : v < 0 ? '▼ ' : ''}{pct(v)}</span> } },

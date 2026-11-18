@@ -2,6 +2,7 @@ import { type Page, useApi } from '../api'
 import { brl, brlCurto, data, dec, int } from '../format'
 import { FAIXAS, faixa } from '../labels'
 import { AlertTriangle, CalendarClock, CalendarX, Clock } from 'lucide-react'
+import { ItemLink } from '../ProdutoPainel'
 import { type Col, DataTable, Empty, ErrorState, Loading, Metric, PageHead, SearchBox, useParam, useTableState } from '../ui'
 
 type Lote = { idmercadoriavariacao: number; descricao: string | null; lote: string; dtvalidade: string; qtdsaldo: number | string; dias_para_vencer: number; faixa: string; valor_em_risco: number | string | null; venda_media_diaria: number | string | null; dias_para_vender: number | string | null; risco_perda: boolean; idlocalestoque: number; dtentrada: string }
@@ -21,7 +22,7 @@ export default function Validades() {
   const r = (id: string) => res?.find(x => x.faixa === id)
 
   const cols: Col<Lote>[] = [
-    { key: 'descricao', label: 'Produto', wrap: true, render: l => <><span className="title">{l.descricao || `Variação ${l.idmercadoriavariacao}`}</span><small>Lote {l.lote} · entrada {data(l.dtentrada)}</small></> },
+    { key: 'descricao', label: 'Produto', wrap: true, render: l => <><ItemLink id={l.idmercadoriavariacao}>{l.descricao || `Variação ${l.idmercadoriavariacao}`}</ItemLink><small>Lote {l.lote} · entrada {data(l.dtentrada)}</small></> },
     { key: 'dias_para_vencer', label: 'Validade', sort: true, render: l => { const f = faixa(l.faixa); return <><span className={f.classe}>{data(l.dtvalidade)}</span><small>{l.dias_para_vencer < 0 ? `venceu há ${-l.dias_para_vencer} dias` : `em ${l.dias_para_vencer} dias`}</small></> } },
     { key: 'qtdsaldo', label: 'Saldo', right: true, sort: true, render: l => dec(l.qtdsaldo) },
     { key: 'valor_em_risco', label: 'Valor (custo)', right: true, sort: true, className: 'money', render: l => brl(l.valor_em_risco) },
