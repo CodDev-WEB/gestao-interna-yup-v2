@@ -8,6 +8,7 @@ type Produto = {
   idmercadoriavariacao: number; descricao: string | null; codigobarras: string | null; setor: string; secao: string | null; situacao: string
   estoque_atual: number | string; valor_estoque: number | string | null; qtd_90d: number | string; faturamento_90d: number | string
   margem_90d_pct: number | string | null; ultima_venda: string | null; dias_sem_venda: number | null; cobertura_dias: number | string | null
+  ultimo_preco_compra: number | null; ultimo_fornecedor: string | null; ultima_compra: string | null
 }
 type Declinio = { idmercadoriavariacao: number; descricao: string | null; qtd_3_meses_atras: number | string; qtd_2_meses_atras: number | string; qtd_mes_passado: number | string; variacao_pct: number | string | null; estoque_atual: number | string }
 
@@ -28,6 +29,7 @@ function Lista() {
     { key: 'situacao', label: 'Situação', render: r => { const x = situacao(r.situacao); return <span className="tag"><i style={{ background: x.cor }} aria-hidden />{x.nome}</span> } },
     { key: 'estoque_atual', label: 'Estoque', right: true, sort: true, render: r => dec(r.estoque_atual) },
     { key: 'valor_estoque', label: 'Valor (custo)', right: true, sort: true, className: 'money', render: r => brl(r.valor_estoque) },
+    { key: 'compra', label: 'Último preço de compra', right: true, render: r => r.ultimo_preco_compra === null ? <span className="muted">—</span> : <>{brl(r.ultimo_preco_compra)}<small>{r.ultimo_fornecedor ?? '—'} · {data(r.ultima_compra)}</small></> },
     { key: 'qtd_90d', label: 'Vendido 90d', right: true, sort: true, render: r => dec(r.qtd_90d) },
     { key: 'faturamento_90d', label: 'Faturamento 90d', right: true, sort: true, sm: false, render: r => brl(r.faturamento_90d) },
     { key: 'margem_90d_pct', label: 'Margem 90d', right: true, sort: true, sm: false, render: r => pct(r.margem_90d_pct) },

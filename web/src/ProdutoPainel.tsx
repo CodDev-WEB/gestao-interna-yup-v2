@@ -13,7 +13,7 @@ import { brl, data as fmtData, dec, int, mes, pct } from './format'
 import { situacao } from './labels'
 import { Empty, ErrorState, Loading, Metric, Tabs } from './ui'
 
-type Entrada = { iddocumento: number; datahora: string | null; data: string; fornecedor: string | null; natureza: string | null; qtd: number; total: number | null; custo_unitario: number | null; lote: string | null; dtvalidade: string | null }
+type Entrada = { iddocumento: number; datahora: string | null; data: string; idfornecedor: number | null; fornecedor: string | null; natureza: string | null; qtd: number; unidades: number; preco_nota: number | null; preco_unidade: number | null; total: number | null; custo_unitario: number | null; lote: string | null; dtvalidade: string | null }
 type Lote = { lote: string; dtentrada: string; dtfabricacao: string | null; dtvalidade: string; dias_para_vencer: number; qtdsaldo: number; local: string; valor: number | null; entrada: Entrada | null }
 type Evento = { quando: string; tipo: string; titulo: string; detalhe?: string; valor?: number | null; futuro: boolean }
 type Ficha = {
@@ -24,7 +24,9 @@ type Ficha = {
     qtd_30d: number; qtd_90d: number; faturamento_90d: number; margem_90d_pct: number | null; cobertura_dias: number | null; dias_sem_venda: number | null
     primeira_entrada: string | null; ultima_entrada: string | null; primeira_venda: string | null; ultima_venda: string | null
     qtd_comprada: number; total_comprado: number; entradas: number; custo_medio_compras: number | null
+    ultimo_preco_compra: number | null; ultimo_fornecedor: string | null; ultima_compra_data: string | null
   }
+  preco_compra: { idfornecedor: number | null; fornecedor: string; compras: number; unidades: number; total: number; ultimo_preco: number | null; ultima_compra: string; penultimo_preco: number | null; variacao_pct: number | null; menor_preco: number | null; maior_preco: number | null; preco_medio: number | null; mais_barato: boolean }[]
   precos: { empresa: number; tabela: number; preco: number | null; custo: number | null; ativo: boolean; alterado: string | null }[]
   estoque_locais: { local: string; empresa: number; qtd: number; reservado: number; atualizado: string | null }[]
   fornecedores: { id: number; nome: string; embalagem: string | null; fator: number | null; codigo: string | null }[]
@@ -174,19 +176,20 @@ function Entradas({ f }: { f: Ficha }) {
         <div><span>Entradas</span><strong>{int(n.entradas)}</strong></div>
         <div><span>Quantidade comprada</span><strong>{dec(n.qtd_comprada)} un.</strong></div>
         <div><span>Total comprado</span><strong>{brl(n.total_comprado)}</strong></div>
-        <div><span>Custo médio</span><strong>{brl(n.custo_medio_compras)}</strong></div>
+        <div><span>Preço médio pago</span><strong>{brl(n.custo_medio_compras)}</strong></div>
       </div>
       <div className="table-wrap cards-sm"><table><caption className="sr-only">Entradas de compra</caption>
-        <thead><tr><th>Data</th><th>Fornecedor</th><th className="r">Qtd</th><th className="r">Custo un.</th><th className="r">Total</th><th>Lote / validade</th></tr></thead>
+        <thead><tr><th>Data</th><th>Fornecedor</th><th className="r">Qtd</th><th className="r">Preço pago (un.)</th><th className="r">Total</th><th>Lote / validade</th></tr></thead>
         <tbody>{f.entradas.map((e, i) => {
-          const ant = f.entradas[i + 1]?.custo_unitario
-          const v = e.custo_unitario !== null && ant ? (e.custo_unitario / ant - 1) * 100 : null
+          // Variação contra a compra anterior do mesmo fornecedor.
+          const ant = f.entradas.slice(i + 1).find(x => x.idfornecedor === e.idfornecedor && x.preco_unidade !== null)?.preco_unidade
+          const v = e.preco_unidade !== null && ant ? (e.preco_unidade / ant - 1) * 100 : null
           return (
             <tr key={`${e.iddocumento}-${i}`}>
               <td><span className="title">{dataHora(e.datahora ?? e.data)}</span><small>Documento {e.iddocumento}</small></td>
-              <td data-label="Fornecedor" className="wrap">{e.fornecedor ?? '—'}{e.natureza && <small>{e.natureza.toLowerCase()}</small>}</td>
-              <td className="r" data-label="Qtd">{dec(e.qtd)}</td>
-              <td className="r" data-label="Custo un.">{brl(e.custo_unitario)}{v !== null && Math.abs(v) >= 0.5 && <small className={v > 0 ? 'down' : 'up'}>{v > 0 ? '▲' : '▼'} {pct(Math.abs(v))}</small>}</td>
+              <td data-label="Fornecedor" className="wrap">{e.fornecedor ?? '—'}</td>
+              <td className="r" data-label="Qtd">{dec(e.unidades)}{e.unidades !== e.qtd && <small>{dec(e.qtd)} na nota</small>}</td>
+              <td className="r money" data-label="Preço pago (un.)">{brl(e.preco_unidade)}{e.unidades !== e.qtd && e.preco_nota !== null && <small>{brl(e.preco_nota)} por unid. da nota</small>}{v !== null && Math.abs(v) >= 0.5 && <small className={v > 0 ? 'down' : 'up'}>{v > 0 ? '▲' : '▼'} {pct(Math.abs(v))} vs. anterior</small>}{e.custo_unitario !== null && <small>custo ERP {brl(e.custo_unitario)}</small>}</td>
               <td className="r money" data-label="Total">{brl(e.total)}</td>
               <td data-label="Lote / validade">{e.lote ? `Lote ${e.lote}` : '—'}{e.dtvalidade && <small>validade {fmtData(e.dtvalidade)}</small>}</td>
             </tr>
@@ -199,7 +202,7 @@ function Entradas({ f }: { f: Ficha }) {
 function Precos({ f }: { f: Ficha }) {
   const n = f.numeros
   const serie = [...f.historico_preco].reverse().filter(h => h.para !== null).map(h => ({ quando: h.datahora.slice(0, 10), preco: h.para }))
-  const custos = [...f.entradas].reverse().filter(e => e.custo_unitario !== null).map(e => ({ quando: e.data, custo: e.custo_unitario }))
+  const custos = [...f.entradas].reverse().filter(e => e.preco_unidade !== null).map(e => ({ quando: e.data, custo: e.preco_unidade, fornecedor: e.fornecedor }))
   return (
     <>
       <div className="mini-metrics">
@@ -209,6 +212,27 @@ function Precos({ f }: { f: Ficha }) {
         <div><span>Markup</span><strong>{pct(n.markup_pct)}</strong></div>
       </div>
       <p className="hint">Último reajuste do preço: {dataHora(n.preco_alterado)}. Margem no preço = (preço − custo) ÷ preço.</p>
+
+      <section className="drawer-block">
+        <h3>Preço de compra por fornecedor</h3>
+        {f.preco_compra.length === 0 ? <Empty>{f.carga.vendas ? 'Nenhuma compra registrada para este item.' : 'Os preços de compra aparecem aqui assim que a carga do ERP chegar nas notas de entrada.'}</Empty> : (
+          <>
+            <p className="hint">Preço pago ao fornecedor por unidade de estoque (total da nota ÷ unidades que entraram).</p>
+            <div className="table-wrap cards-sm"><table><caption className="sr-only">Preço de compra por fornecedor</caption>
+              <thead><tr><th>Fornecedor</th><th className="r">Último preço</th><th className="r">Variação</th><th className="r">Menor / maior</th><th className="r">Médio</th><th className="r">Compras</th></tr></thead>
+              <tbody>{f.preco_compra.map((p, i) => (
+                <tr key={i}>
+                  <td className="wrap"><span className="title">{p.fornecedor}</span>{p.mais_barato && <span className="pill good" style={{ marginLeft: 6 }}>mais barato</span>}<small>última compra {fmtData(p.ultima_compra)}</small></td>
+                  <td className="r money" data-label="Último preço">{brl(p.ultimo_preco)}</td>
+                  <td className="r" data-label="Variação">{p.variacao_pct === null ? '—' : <span className={p.variacao_pct > 0 ? 'down' : 'up'}>{p.variacao_pct > 0 ? '▲' : '▼'} {pct(Math.abs(p.variacao_pct))}</span>}{p.penultimo_preco !== null && <small>antes {brl(p.penultimo_preco)}</small>}</td>
+                  <td className="r" data-label="Menor / maior">{brl(p.menor_preco)} / {brl(p.maior_preco)}</td>
+                  <td className="r" data-label="Médio">{brl(p.preco_medio)}</td>
+                  <td className="r" data-label="Compras">{int(p.compras)}<small>{dec(p.unidades)} un.</small></td>
+                </tr>
+              ))}</tbody></table></div>
+          </>
+        )}
+      </section>
 
       <section className="drawer-block">
         <h3>Alterações do preço de venda</h3>
@@ -241,15 +265,15 @@ function Precos({ f }: { f: Ficha }) {
       </section>
 
       <section className="drawer-block">
-        <h3>Custo nas compras</h3>
-        {custos.length === 0 ? <Empty>Sem compras registradas para mostrar a evolução do custo.</Empty> : (
+        <h3>Preço de compra ao longo do tempo</h3>
+        {custos.length === 0 ? <Empty>Sem compras registradas para mostrar a evolução do preço de compra.</Empty> : (
           <div style={{ height: 170 }}>
             <ResponsiveContainer>
               <LineChart data={custos} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid stroke="var(--grid)" vertical={false} />
                 <XAxis dataKey="quando" tickFormatter={d => fmtData(d).slice(0, 5)} tick={{ fill: 'var(--muted)', fontSize: 11 }} tickLine={false} axisLine={{ stroke: 'var(--line-2)' }} minTickGap={20} />
                 <YAxis tickFormatter={v => brl(v)} tick={{ fill: 'var(--muted)', fontSize: 11 }} tickLine={false} axisLine={false} width={78} domain={['auto', 'auto']} />
-                <Tooltip content={({ active, payload }) => active && payload?.length ? <div className="chart-tip"><strong>{fmtData(String(payload[0].payload.quando))}</strong>custo {brl(Number(payload[0].payload.custo))}</div> : null} />
+                <Tooltip content={({ active, payload }) => active && payload?.length ? <div className="chart-tip"><strong>{fmtData(String(payload[0].payload.quando))}</strong>pago {brl(Number(payload[0].payload.custo))}/un.<br />{payload[0].payload.fornecedor ?? ''}</div> : null} />
                 <Line type="monotone" dataKey="custo" stroke="var(--s2)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
@@ -357,7 +381,8 @@ export default function ProdutoPainel() {
             <>
               <div className="metrics compact">
                 <Metric icon={<Box size={16} />} tone="turquoise" label="Estoque" value={`${dec(n.estoque)} un.`} detail={`${brl(n.valor_estoque)} a custo`} />
-                <Metric icon={<DollarSign size={16} />} tone="gold" label="Custo unitário" value={brl(n.custo)} detail={n.custo_medio_compras !== null ? `média das compras ${brl(n.custo_medio_compras)}` : 'custo médio do ERP'} />
+                <Metric icon={<DollarSign size={16} />} tone="gold" label="Último preço de compra" value={brl(n.ultimo_preco_compra)}
+                  detail={n.ultimo_preco_compra !== null ? `${n.ultimo_fornecedor ?? 'fornecedor —'} · ${fmtData(n.ultima_compra_data)} · custo ERP ${brl(n.custo)}` : `custo no ERP ${brl(n.custo)}`} />
                 <Metric icon={<Receipt size={16} />} tone="purple" label="Preço de venda" value={brl(n.preco_venda)} detail={n.margem_pct !== null ? `margem ${pct(n.margem_pct)}` : 'sem custo para margem'} />
                 <Metric icon={<TrendingUp size={16} />} tone="green" label="Vendido 90 dias" value={`${dec(n.qtd_90d)} un.`} detail={n.ultima_venda ? `última venda ${fmtData(n.ultima_venda)}` : 'sem vendas registradas'} />
               </div>

@@ -93,15 +93,41 @@ export async function produtoDetalhe(id: number, db: Supabase) {
 
   const entradas = compras.map(c => {
     const qtd = num(c.qtd as Num) ?? 0
+    const qtdEstoque = num(c.qtdestoque as Num)
     const total = num(c.valtotalliquido as Num)
+    // Unidades que entraram no estoque (a nota pode vir em caixa/fardo; qtdestoque já está convertido).
+    const unidades = qtdEstoque && qtdEstoque > 0 ? qtdEstoque : qtd
     return {
-      iddocumento: c.iddocumento, datahora: c.datahora, data: c.data,
+      iddocumento: c.iddocumento, datahora: c.datahora, data: c.data, idfornecedor: num(c.idfornecedor as Num),
       fornecedor: nomePessoa(pessoa.get(Number(c.idfornecedor))) ?? (c.idfornecedor ? `Fornecedor ${c.idfornecedor}` : null),
+      // Preço pago ao fornecedor: por unidade da nota e por unidade de estoque.
+      preco_nota: num(c.valunitarioliquido as Num) ?? (total !== null && qtd ? total / qtd : null),
+      unidades, preco_unidade: total !== null && unidades ? total / unidades : null,
       natureza: (natureza(c.idnaturezaoperacao)?.descricao as string | undefined) ?? null,
       qtd, total, custo_unitario: num(c.custo_unitario as Num) ?? (total !== null && qtd ? total / qtd : null),
       lote: c.lote || null, dtvalidade: c.dtvalidade ?? null,
     }
   })
+
+  // Preço de compra por fornecedor (entradas já vêm da mais recente para a mais antiga).
+  const porForn = new Map<string, typeof entradas>()
+  for (const e of entradas) { const k = String(e.idfornecedor ?? e.fornecedor ?? '?'); porForn.set(k, [...(porForn.get(k) ?? []), e]) }
+  const precoCompra = [...porForn.values()].map(es => {
+    const comPreco = es.filter(e => e.preco_unidade !== null)
+    const ult = comPreco[0], pen = comPreco[1]
+    const un = es.reduce((a, e) => a + e.unidades, 0), tot = es.reduce((a, e) => a + (e.total ?? 0), 0)
+    const ps = comPreco.map(e => e.preco_unidade as number)
+    return {
+      idfornecedor: es[0].idfornecedor, fornecedor: es[0].fornecedor ?? 'Fornecedor não identificado', compras: es.length, unidades: un, total: tot,
+      ultimo_preco: ult?.preco_unidade ?? null, ultima_compra: ult?.data ?? es[0].data, penultimo_preco: pen?.preco_unidade ?? null,
+      variacao_pct: ult && pen && pen.preco_unidade ? ((ult.preco_unidade as number) / pen.preco_unidade - 1) * 100 : null,
+      menor_preco: ps.length ? Math.min(...ps) : null, maior_preco: ps.length ? Math.max(...ps) : null, preco_medio: un ? tot / un : null,
+      mais_barato: false,
+    }
+  }).sort((a, b) => String(b.ultima_compra).localeCompare(String(a.ultima_compra)))
+  const menorUltimo = Math.min(...precoCompra.map(p => p.ultimo_preco ?? Infinity))
+  if (precoCompra.length > 1 && isFinite(menorUltimo)) for (const p of precoCompra) p.mais_barato = p.ultimo_preco === menorUltimo
+  const ultimaEntrada = entradas.find(e => e.preco_unidade !== null)
 
   const lotesOut = lotes.map(l => {
     const validade = String(l._dtvalidade)
@@ -130,7 +156,7 @@ export async function produtoDetalhe(id: number, db: Supabase) {
   // Linha do tempo: tudo que mudou no item, do mais recente para o mais antigo.
   type Evento = { quando: string; tipo: string; titulo: string; detalhe?: string; valor?: number | null }
   const ev: Evento[] = []
-  for (const e of entradas) ev.push({ quando: String(e.datahora ?? e.data), tipo: 'entrada', titulo: `Entrada de ${fmtQtd(e.qtd)} ${un(e.qtd)}`, detalhe: [e.fornecedor, e.custo_unitario !== null ? `custo ${brl(e.custo_unitario)}/un` : null, e.lote ? `lote ${e.lote}` : null, e.dtvalidade ? `validade ${dataBr(String(e.dtvalidade))}` : null].filter(Boolean).join(' · '), valor: e.total })
+  for (const e of entradas) ev.push({ quando: String(e.datahora ?? e.data), tipo: 'entrada', titulo: `Entrada de ${fmtQtd(e.unidades)} ${un(e.unidades)}`, detalhe: [e.fornecedor, e.preco_unidade !== null ? `pago ${brl(e.preco_unidade)}/un` : null, e.lote ? `lote ${e.lote}` : null, e.dtvalidade ? `validade ${dataBr(String(e.dtvalidade))}` : null].filter(Boolean).join(' · '), valor: e.total })
   for (const p of precosHist) ev.push({ quando: String(p.datahora), tipo: 'preco', titulo: `Preço de venda ${p.de !== null && p.para !== null && p.para < p.de ? 'reduzido' : 'alterado'}`, detalhe: `${brl(p.de)} → ${brl(p.para)}${p.variacao_pct !== null ? ` (${p.variacao_pct > 0 ? '+' : ''}${p.variacao_pct.toFixed(1).replace('.', ',')}%)` : ''}${p.tabela !== 1 ? ` · tabela ${p.tabela}` : ''}` })
   for (const s of saldoHist) if (s.tipo !== 'venda' && s.tipo !== 'compra') ev.push({ quando: String(s.datahora), tipo: s.tipo === 'devolucao' ? 'devolucao' : 'ajuste', titulo: s.nome, detalhe: `saldo ${fmtQtd(s.de)} → ${fmtQtd(s.para)} (${s.diferenca > 0 ? '+' : ''}${fmtQtd(s.diferenca)})${s.documento ? ` · ${s.documento}` : ''}` })
   for (const i of inventarios) ev.push({ quando: String(i.datahora), tipo: 'inventario', titulo: 'Contagem de inventário', detalhe: `contado ${fmtQtd(num(i.qtdcontada as Num))}, sistema tinha ${fmtQtd(num(i.qtdanterior as Num))}${i.lote ? ` · lote ${i.lote}` : ''}` })
@@ -145,7 +171,7 @@ export async function produtoDetalhe(id: number, db: Supabase) {
   const linha = ev.slice(0, 250).map(e => ({ ...e, futuro: e.quando.slice(0, 10) > hoje }))
 
   const totalComprado = entradas.reduce((a, e) => a + (e.total ?? 0), 0)
-  const qtdComprada = entradas.reduce((a, e) => a + e.qtd, 0)
+  const qtdComprada = entradas.reduce((a, e) => a + e.unidades, 0)
 
   return {
     hoje,
@@ -169,7 +195,9 @@ export async function produtoDetalhe(id: number, db: Supabase) {
       primeira_venda: base?.primeira_venda ?? null, ultima_venda: base?.ultima_venda ?? null,
       qtd_comprada: qtdComprada, total_comprado: totalComprado, entradas: entradas.length,
       custo_medio_compras: qtdComprada ? totalComprado / qtdComprada : null,
+      ultimo_preco_compra: ultimaEntrada?.preco_unidade ?? null, ultimo_fornecedor: ultimaEntrada?.fornecedor ?? null, ultima_compra_data: ultimaEntrada?.data ?? null,
     },
+    preco_compra: precoCompra,
     precos: precos.map(p => ({ empresa: p._idempresa, tabela: p._idtabela, preco: num(p.valpreco as Num), custo: num(p.valcusto as Num), ativo: p.flaginativo !== 'T', alterado: p.dtalteracao })),
     estoque_locais: estoque.map(e => ({ local: local(e._idempresa, e._idlocalestoque) ?? `Local ${e._idlocalestoque}`, empresa: e._idempresa, qtd: num(e.qtdsaldo as Num) ?? 0, reservado: num(e.qtdsaldoreserva as Num) ?? 0, atualizado: e.datahora })),
     fornecedores: fornecedoresCad.map(f => ({ id: f._idpessoa, nome: nomePessoa(pessoa.get(Number(f._idpessoa))) ?? `Fornecedor ${f._idpessoa}`, embalagem: f._embalagem || null, fator: num(f.qtdfator as Num), codigo: f.codigoexterno || null })),

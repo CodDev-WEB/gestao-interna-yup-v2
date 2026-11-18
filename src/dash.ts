@@ -42,6 +42,24 @@ function periodo(q: URLSearchParams, padraoDias: number) {
 type Num = number | string | null
 const n = (v: Num) => (v === null || v === undefined ? 0 : Number(v))
 
+/** Acrescenta a cada produto o último preço de compra (por unidade de estoque) e de quem foi comprado. */
+async function comUltimaCompra(db: Supabase, rows: Record<string, unknown>[]) {
+  const ids = [...new Set(rows.map(r => Number(r.idmercadoriavariacao)).filter(Number.isSafeInteger))]
+  if (!ids.length) return rows
+  const compras = await db.select<Record<string, Num>>('vw_compra_item', `idmercadoriavariacao=in.(${ids.join(',')})&select=idmercadoriavariacao,data,idfornecedor,qtd,qtdestoque,valtotalliquido&order=datahora.desc&limit=2000`)
+  const ultima = new Map<number, Record<string, Num>>()
+  for (const c of compras) if (!ultima.has(Number(c.idmercadoriavariacao)) && n(c.valtotalliquido) > 0) ultima.set(Number(c.idmercadoriavariacao), c)
+  const idsForn = [...new Set([...ultima.values()].map(c => Number(c.idfornecedor)).filter(x => x > 0))]
+  const pessoas = idsForn.length ? await db.select<Record<string, string | number | null>>('erp_pessoa', `_idpessoa=in.(${idsForn.join(',')})&select=_idpessoa,nome,sobrenome`) : []
+  const nome = new Map(pessoas.map(p => [Number(p._idpessoa), [p.nome, p.sobrenome].map(x => String(x ?? '').trim()).filter(Boolean).join(' ')]))
+  return rows.map(r => {
+    const c = ultima.get(Number(r.idmercadoriavariacao))
+    if (!c) return { ...r, ultimo_preco_compra: null, ultimo_fornecedor: null, ultima_compra: null }
+    const un = n(c.qtdestoque) > 0 ? n(c.qtdestoque) : n(c.qtd)
+    return { ...r, ultimo_preco_compra: un ? n(c.valtotalliquido) / un : null, ultimo_fornecedor: nome.get(Number(c.idfornecedor)) || (c.idfornecedor ? `Fornecedor ${c.idfornecedor}` : null), ultima_compra: c.data }
+  })
+}
+
 export async function dash(path: string, q: URLSearchParams, db: Supabase): Promise<unknown> {
   switch (path) {
     // Visão executiva: período atual vs anterior, capital por situação e pontos a atacar.
@@ -94,7 +112,8 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       const sit = pick(q.get('situacao'), SITUACOES), setor = pick(q.get('setor'), [...SETORES, 'Não classificado']), s = busca(q.get('busca'))
       const filtro = (sit ? `&situacao=eq.${sit}` : '') + (setor ? `&setor=eq.${encodeURIComponent(setor)}` : '') + (s ? ilike('descricao', s) : '')
       const cols = ['valor_estoque', 'estoque_atual', 'dias_sem_venda', 'qtd_90d', 'faturamento_90d', 'lucro_90d', 'margem_90d_pct', 'cobertura_dias', 'descricao', 'ultima_venda']
-      return db.selectPage('vw_produto_desempenho', `select=*${filtro}${order(q.get('ordem'), cols, 'valor_estoque', q.get('dir'))}`, limit, offset)
+      const page = await db.selectPage<Record<string, unknown>>('vw_produto_desempenho', `select=*${filtro}${order(q.get('ordem'), cols, 'valor_estoque', q.get('dir'))}`, limit, offset)
+      return { ...page, rows: await comUltimaCompra(db, page.rows) }
     }
 
     case 'lotes': {

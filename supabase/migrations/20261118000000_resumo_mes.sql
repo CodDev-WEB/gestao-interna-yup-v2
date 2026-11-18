@@ -66,7 +66,7 @@ begin
                   count(distinct v.iddocumento) as vendas, count(*) filter (where v.custo_unitario is null) as sem_custo
              from v group by 1),
   prod_out as (select p.*, n.nome from prod p left join nome n on n.id = p.id),
-  comp as (select c.idmercadoriavariacao as id, sum(c.qtd) as qtd, sum(c.valtotalliquido) as valor, count(distinct c.iddocumento) as notas
+  comp as (select c.idmercadoriavariacao as id, sum(coalesce(nullif(c.qtdestoque, 0), c.qtd)) as qtd, sum(c.valtotalliquido) as valor, count(distinct c.iddocumento) as notas
              from c group by 1),
   -- Fornecedor de cada produto vendido: o da compra mais recente; sem compra, o primeiro cadastrado.
   ult_compra as (select distinct on (idmercadoriavariacao) idmercadoriavariacao as id, idfornecedor
