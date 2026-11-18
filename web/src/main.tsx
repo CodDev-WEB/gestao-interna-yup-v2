@@ -1,13 +1,14 @@
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
-import { CalendarClock, ChevronRight, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, Truck, Users } from 'lucide-react'
+import { CalendarClock, CalendarRange, ChevronRight, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, Truck, Users } from 'lucide-react'
 import './styles.css'
 import { currentUser, logout, onAuthChange } from './api'
 import { Brand } from './ui'
 import ProdutoPainel from './ProdutoPainel'
 import Login from './pages/Login'
 import Resumo from './pages/Resumo'
+import Mes from './pages/Mes'
 import Produtos from './pages/Produtos'
 import Validades from './pages/Validades'
 import Fornecedores from './pages/Fornecedores'
@@ -17,6 +18,7 @@ import Sincronizacao from './pages/Sincronizacao'
 
 const NAV = [
   { to: '/', label: 'Visão geral', icon: LayoutDashboard, end: true },
+  { to: '/mes', label: 'Resumo do mês', icon: CalendarRange },
   { to: '/produtos', label: 'Produtos e estoque', icon: Package },
   { to: '/validades', label: 'Validades', icon: CalendarClock },
   { to: '/fornecedores', label: 'Fornecedores', icon: Truck },
@@ -47,6 +49,7 @@ function App() {
       <main className="content">
         <Routes>
           <Route path="/" element={<Resumo />} />
+          <Route path="/mes" element={<Mes />} />
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/validades" element={<Validades />} />
           <Route path="/fornecedores" element={<Fornecedores />} />

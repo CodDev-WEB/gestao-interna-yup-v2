@@ -304,6 +304,34 @@ await test('views: clientes, setores, declínio e resumo executam', async () => 
   assert.equal(Number(resumo.produtos_sem_saida), 1); assert.equal(Number(resumo.lotes_criticos), 1); assert.equal(Number(resumo.itens_aumento_custo_10pct), 1)
 })
 
+await test('resumo do mês: vendas, compras, rankings e histórico batem com as views', async () => {
+  const ref = day(-10)
+  const ini = ref.slice(0, 8) + '01'
+  const r = (await sb.query<{ r: Record<string, any> }>(`select resumo_mes('${ref}') as r`)).rows[0].r
+  const soma = async (view: string) => Number((await one<{ s: string }>(`select coalesce(sum(valtotalliquido), 0) as s from ${view} where data >= '${ini}' and data < (date '${ini}' + interval '1 month')`)).s)
+  const fat = await soma('vw_venda_item'), comp = await soma('vw_compra_item'), dev = await soma('vw_devolucao_item')
+  assert.equal(r.mes, ref.slice(0, 7))
+  assert.equal(Number(r.kpis.faturamento), fat)
+  assert.equal(Number(r.kpis.compras), comp)
+  assert.equal(Number(r.kpis.faturamento_liquido), Math.round((fat - dev) * 100) / 100)
+  assert.equal(r.historico.length, 12)
+  assert.equal(r.historico[11].mes, r.mes)
+  assert.equal(r.por_dia.length, r.dias_no_mes)
+  assert.equal(r.por_dia.reduce((a: number, d: any) => a + Number(d.faturamento), 0), fat)
+  if (fat > 0) {
+    assert.ok(r.top_faturamento.length > 0)
+    const pct = r.setores.reduce((a: number, x: any) => a + Number(x.pct), 0)
+    assert.ok(Math.abs(pct - 100) < 0.1, `setores somam ${pct}%`)
+  }
+  if (comp > 0) assert.ok(Math.abs(r.fornecedores_compra.reduce((a: number, x: any) => a + Number(x.pct), 0) - 100) < 0.1)
+  // Mês do pedido de compra de 30 dias atrás: fornecedor 500, 10 un. a 11.
+  const rc = (await sb.query<{ r: Record<string, any> }>(`select resumo_mes('${day(-30)}') as r`)).rows[0].r
+  const f = rc.fornecedores_compra.find((x: any) => Number(x.id) === 500)
+  assert.ok(f, 'fornecedor 500 deveria aparecer nas compras do mês')
+  assert.equal(f.nome, "DISTRIBUIDORA D'OESTE")
+  assert.ok(Number(f.valor) >= 110)
+})
+
 // ---------- Mudanças no ERP ----------
 await erp.exec(`update documento set status = 'C' where _iddocumento = 11`)
 await erp.exec(`delete from mercadoria_estoque_lote where _lote = 'L2'`)

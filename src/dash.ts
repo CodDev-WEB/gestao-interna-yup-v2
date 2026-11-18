@@ -1,7 +1,7 @@
 // API de leitura do site (/api/dash/*). Só admin logado chega aqui (checado em index.ts).
 // O navegador só envia filtros; cada filtro é validado contra uma lista fechada antes de virar consulta.
 
-import type { Supabase } from './supabase/client'
+import { SupabaseError, type Supabase } from './supabase/client'
 import { produtoDetalhe } from './produto'
 
 export class DashError extends Error {}
@@ -143,6 +143,20 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
 
     case 'secoes':
       return db.select('vw_secao_setor', 'select=*&order=descricao.asc')
+
+    // Resumo do mês: calculado no banco (função resumo_mes), uma chamada só.
+    case 'mes': {
+      const m = q.get('mes')
+      const mes = m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m) ? m : hojeBelem().slice(0, 7)
+      try { return await db.rpc('resumo_mes', { p_mes: `${mes}-01` }) }
+      catch (e) {
+        if (e instanceof SupabaseError && (e.status === 404 || /resumo_mes|PGRST202/.test(e.message))) throw new DashError('O resumo do mês ainda não foi instalado no banco. Falta aplicar a migração 20261118000000_resumo_mes.sql (ver Sincronização).')
+        throw e
+      }
+    }
+
+    case 'meses':
+      return db.select('vw_meses_movimento', 'select=mes,documentos&order=mes.desc').catch(() => [])
 
     // Ficha completa de um item (painel que abre ao clicar no produto).
     case 'produto': {
