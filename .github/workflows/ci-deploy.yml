@@ -54,11 +54,12 @@ jobs:
       # Os ausentes só geram aviso; o valor nunca aparece no log.
       - name: Sync operational Worker secrets from GitHub
         env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ERP_TOKEN: ${{ secrets.ERP_TOKEN }}
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
         run: |
-          for name in SUPABASE_SERVICE_ROLE_KEY ERP_TOKEN ADMIN_TOKEN; do
+          for name in SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY ERP_TOKEN ADMIN_TOKEN; do
             if [ -n "${!name}" ]; then
               printf '%s' "${!name}" | npx wrangler secret put "$name" --config wrangler.jsonc >/dev/null
               echo "$name: enviado ao Worker"
@@ -84,4 +85,4 @@ jobs:
       - name: Smoke test deployed Worker
         run: |
           sleep 5
-          curl -fsS https://gestao-interna-yup-v2.jordano-19-silva.workers.dev/api/health
+          curl -fsS https://gestao-interna-yup-v2.jordano-19-silva.workers.dev/api/health | tee /dev/stderr | grep -q '"supabase": true'
