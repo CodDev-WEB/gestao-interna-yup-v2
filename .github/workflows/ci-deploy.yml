@@ -47,6 +47,20 @@ jobs:
           echo "::error::Deployment blocked: configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository Actions secrets."
           exit 1
 
+      # Diagnóstico sem expor valores: token ativo, contas visíveis e se CLOUDFLARE_ACCOUNT_ID é uma delas.
+      - name: Diagnose Cloudflare token
+        run: |
+          api() { curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4$1"; }
+          echo "Token (user):    $(api /user/tokens/verify | jq -c '{success, status: .result.status, errors: [.errors[].message]}')"
+          echo "Token (account): $(api /accounts/$CLOUDFLARE_ACCOUNT_ID/tokens/verify | jq -c '{success, status: .result.status, errors: [.errors[].message]}')"
+          echo "Contas visíveis: $(api /accounts | jq -c '[.result[]?.name]')"
+          if api /accounts | jq -e --arg id "$CLOUDFLARE_ACCOUNT_ID" '[.result[]?.id] | index($id)' >/dev/null; then
+            echo "CLOUDFLARE_ACCOUNT_ID: corresponde a uma conta visível"
+          else
+            echo "::warning::CLOUDFLARE_ACCOUNT_ID não corresponde a nenhuma conta visível pelo token (comprimento ${#CLOUDFLARE_ACCOUNT_ID}, esperado 32)"
+          fi
+          echo "Ler Worker v2: $(api /accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/gestao-interna-yup-v2/settings | jq -c '{success, errors: [.errors[].message]}')"
+
       - name: Deploy isolated v2 Worker and static assets
         run: npx wrangler deploy --config wrangler.jsonc
 
