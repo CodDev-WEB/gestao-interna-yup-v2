@@ -21,9 +21,11 @@
     "ERP_PAGE_SIZE": "100",
     "ERP_UTC_OFFSET": "-03:00",
     "STORE_TIME_ZONE": "America/Belem",
-    "SYNC_MAX_SUBREQUESTS": "45"
+    "SYNC_MAX_SUBREQUESTS": "45",
+    // Endereço público do projeto Supabase da v2 (não é segredo).
+    "SUPABASE_URL": "https://udrsdiuzztelysxiozpl.supabase.co"
   },
   "observability": { "enabled": true },
   "previews": {}
-  // Secrets (nunca neste arquivo): ERP_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_TOKEN.
+  // Secrets (nunca neste arquivo): ERP_TOKEN, SUPABASE_SERVICE_ROLE_KEY, ADMIN_TOKEN.
 }
