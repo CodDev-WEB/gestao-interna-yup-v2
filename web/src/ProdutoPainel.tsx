@@ -79,13 +79,9 @@ function Dados({ itens }: { itens: [string, ReactNode][] }) {
 
 function Geral({ f }: { f: Ficha }) {
   const n = f.numeros, it = f.item
-  const somaLotes = f.lotes.reduce((a, l) => a + Math.max(0, l.qtdsaldo), 0)
   const temVenda = f.vendas_mes.some(m => m.qtd > 0)
   return (
     <>
-      {f.lotes.length > 0 && Math.abs(somaLotes - n.estoque) > 0.001 && (
-        <div className="notice"><AlertTriangle size={18} aria-hidden /><div><strong>Saldo dos lotes diferente do estoque.</strong> Os lotes somam {dec(somaLotes)} un., mas o estoque do item é {dec(n.estoque)} un. Vale conferir os lotes no ERP: lotes com saldo que já saiu deixam o controle de validade errado.</div></div>
-      )}
       <section className="drawer-block">
         <h3>Cadastro</h3>
         <Dados itens={[
@@ -148,7 +144,7 @@ function Lotes({ f }: { f: Ficha }) {
   return (
     <>
       <div className="controls">
-        <span className="muted">{int(ativos.length)} {ativos.length === 1 ? 'lote com saldo' : 'lotes com saldo'}{qZerados > 0 && ` · ${int(qZerados)} já zerados`}</span>
+        <span className="muted">{int(ativos.length)} {ativos.length === 1 ? 'lote com saldo' : 'lotes com saldo'} · {dec(ativos.reduce((a, l) => a + l.qtdsaldo, 0))} un. em lotes{qZerados > 0 && ` · ${int(qZerados)} já zerados`}</span>
         {qZerados > 0 && <button type="button" className="chip" aria-pressed={zerados} onClick={() => setZerados(z => !z)}>Mostrar lotes zerados</button>}
       </div>
       {lista.length === 0 ? <Empty>Nenhum lote com saldo.</Empty> : (
