@@ -92,6 +92,19 @@ function pick(row: Record<string, unknown>, col: string): unknown {
   return found === undefined ? undefined : row[found]
 }
 
+/** Dados para localizar no ERP o registro que não pôde ser lido (vai para o diagnóstico da tela Sincronização). */
+export type RowErrorInfo = { tabela: string; coluna: string; valor: unknown; motivo: string; registro: Record<string, unknown> }
+
+/** Valor de um registro que não converte: guarda tabela, coluna, valor e as colunas que identificam o registro. */
+export class RowError extends Error {
+  constructor(message: string, public info: RowErrorInfo) { super(message) }
+}
+
+// Colunas que ajudam a achar o registro no ERP (as que existirem na tabela).
+const IDENT = ['_idempresa', 'idempresa', '_idlocalestoque', 'idlocalestoque', '_idmercadoriavariacao', 'idmercadoriavariacao', '_idmercadoria', 'idmercadoria',
+  '_iddocumento', '_idsequencia', 'numero', 'serie', 'modelo', 'datahora', 'idpessoa', '_idpessoa', '_lote', 'lote', '_dtentrada', '_dtvalidade', 'dtvalidade',
+  '_idinventario', '_idtabela', '_idhistorico', 'descricao', 'nome', 'codigobarras', 'qtdsaldo']
+
 /** Converte um registro do ERP. Coluna ausente ou valor inválido = erro com o motivo. */
 export function convertRow(d: Dataset, row: Record<string, unknown>, utcOffset: string): TypedRow {
   const out: TypedRow = {}
@@ -99,7 +112,12 @@ export function convertRow(d: Dataset, row: Record<string, unknown>, utcOffset: 
     const raw = pick(row, col)
     if (raw === undefined) throw new Error(`${d.table}: coluna "${col}" não veio na resposta do ERP`)
     try { out[col] = convertValue(columnType(col), raw, utcOffset) }
-    catch (e) { throw new Error(`${d.table}.${col} = ${JSON.stringify(raw)}: ${e instanceof Error ? e.message : String(e)}`) }
+    catch (e) {
+      const motivo = e instanceof Error ? e.message : String(e)
+      const registro: Record<string, unknown> = {}
+      for (const c of IDENT) if (d.columns.includes(c)) { const v = pick(row, c); if (v !== undefined && v !== null && v !== '') registro[c] = typeof v === 'string' ? v.slice(0, 120) : v }
+      throw new RowError(`${d.table}.${col} = ${JSON.stringify(raw)}: ${motivo}`, { tabela: d.table, coluna: col, valor: raw, motivo, registro })
+    }
     if (d.keys.includes(col) && out[col] === null) throw new Error(`${d.table}: chave "${col}" nula`)
   }
   return out

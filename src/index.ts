@@ -11,6 +11,7 @@ import { buildCount, buildSelect } from './sync/sql'
 import { runSync, type SyncOptions } from './sync/engine'
 import { PostgrestStore } from './sync/store'
 import { dash, DashError, salvarSecao } from './dash'
+import { diagnosticar, lerErro } from './sync/diagnostico'
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data, null, 2), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
@@ -238,11 +239,18 @@ export default {
             db.select<{ dataset: string }>('sync_state', 'select=*'),
             db.select('sync_runs', 'select=id,mode,status,started_at,finished_at,rows_written,erp_requests,error&order=started_at.desc&limit=10'),
           ])
-          const byName = new Map(states.map(s => [s.dataset, s]))
+          const byName = new Map(states.map(s => [s.dataset, s as { dataset: string; last_error?: string | null }]))
+          // Erro de registro: separa a mensagem do detalhe e monta o "o que corrigir" com item, lote e documento.
+          const jobs = await Promise.all(DATASETS.map(async d => {
+            const st = byName.get(d.name)
+            const { mensagem, info } = lerErro(st?.last_error)
+            const diagnostico = info ? await diagnosticar(info, mensagem, db).catch(() => null) : null
+            return { dataset: d.name, kind: d.kind, refresh_minutes: d.refreshMinutes, description: d.description, state: st ? { ...st, last_error: st.last_error ? mensagem : null } : null, diagnostico }
+          }))
           return json({
             ok: true,
             settings: settings[0] ?? null,
-            jobs: DATASETS.map(d => ({ dataset: d.name, kind: d.kind, refresh_minutes: d.refreshMinutes, description: d.description, state: byName.get(d.name) ?? null })),
+            jobs,
             runs,
           })
         }

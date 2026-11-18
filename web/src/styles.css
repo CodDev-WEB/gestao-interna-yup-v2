@@ -388,3 +388,26 @@ td.money { font-weight: 700; color: var(--ink); }
   .month-picker { width: 100%; }
   .month-picker .select { flex: 1; min-width: 0; }
 }
+
+/* ---------- Sincronização: o que corrigir ---------- */
+.fix-list { display: grid; gap: 14px; }
+.fix { background: var(--panel); border: 1px solid #f2d3d0; border-left: 4px solid var(--critical); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); }
+.fix-head { display: grid; grid-template-columns: 40px 1fr auto; gap: 14px; align-items: start; margin-bottom: 14px; }
+.fix-head h3 { font-size: 17px; margin: 4px 0 4px; }
+.fix-icon { width: 40px; height: 40px; border-radius: 11px; background: var(--critical-soft); color: var(--critical); display: grid; place-items: center; }
+.fix-problema { margin: 0; color: var(--ink-2); }
+.fix-kv { grid-template-columns: repeat(4, minmax(0, 1fr)); background: #fafbfc; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.fix-onde { display: flex; gap: 8px; align-items: flex-start; margin: 14px 0 8px; color: var(--ink-2); }
+.fix-onde svg { flex: none; margin-top: 3px; color: var(--turquoise-ink); }
+.fix-passos { margin: 0; padding-left: 22px; display: grid; gap: 4px; color: var(--ink); }
+.fix-tec { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.fix-tec summary { cursor: pointer; }
+.fix-tec code { display: block; margin-top: 6px; white-space: pre-wrap; word-break: break-word; background: #f4f6f8; padding: 8px 10px; border-radius: 6px; }
+@media (max-width: 760px) {
+  .fix { padding: 14px; }
+  .fix-head { grid-template-columns: 34px 1fr; }
+  .fix-head .btn { grid-column: 1 / -1; }
+  .fix-icon { width: 34px; height: 34px; }
+  .fix-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.kv dd.status-bad { color: var(--critical); }

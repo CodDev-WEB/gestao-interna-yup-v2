@@ -6,6 +6,7 @@
 // Uso: npm test
 
 import { PGlite } from '@electric-sql/pglite'
+import { diagnosticar, lerErro } from '../src/sync/diagnostico'
 import { readFileSync, readdirSync } from 'node:fs'
 import assert from 'node:assert/strict'
 import { columnType, DATASETS, mirrorTables, type ColType } from '../src/sync/datasets'
@@ -359,6 +360,29 @@ await test('erro de dados num job não para os outros e fica registrado', async 
   const g = (await store.getStates()).find(s => s.dataset === 'mercadoria_grupo')!
   assert.equal(g.status, 'error'); assert.match(g.last_error!, /descricao/)
   assert.equal(await count(sb, 'select count(*) as n from erp_mercadoria_marca where _idmarca = 2'), 1)
+})
+
+await test('registro inválido: guarda item, lote e campo e o diagnóstico diz onde corrigir', async () => {
+  await erp.exec(`alter table mercadoria_grupo rename column descricao_x to descricao`)
+  await erp.exec(`insert into mercadoria_estoque_lote (_idempresa, _idlocalestoque, _idmercadoriavariacao, _lote, _dtvalidade, _dtentrada, qtdsaldo, datahora) values (1, 1, 110, 'LX9', '0206-01-30', '${day(-15)}', 7, '${at(0)}')`)
+  const clock = new Date(t1.getTime() + 50 * 3600 * 1000)
+  await runSync({ erp: new FakeErp(25, 25), store }, { ...opts, trigger: 'manual', only: ['mercadoria_estoque_lote'], now: () => clock })
+  const st = (await store.getStates()).find(x => x.dataset === 'mercadoria_estoque_lote')!
+  assert.equal(st.status, 'error')
+  const { mensagem, info } = lerErro(st.last_error)
+  assert.match(mensagem, /_dtvalidade/)
+  assert.ok(info, 'detalhe estruturado deveria estar gravado')
+  assert.equal(info!.coluna, '_dtvalidade')
+  assert.equal(Number(info!.registro._idmercadoriavariacao), 110)
+  assert.equal(info!.registro._lote, 'LX9')
+  const fakeDb = { select: async (t: string, q: string) => (await sb.query(t === 'vw_produto_desempenho' ? `select descricao, codigobarras, secao, setor, estoque_atual from vw_produto_desempenho where idmercadoriavariacao = ${q.match(/eq\.(\d+)/)![1]}` : t === 'erp_local_estoque' ? `select descricao from erp_local_estoque where _idlocal = ${q.match(/_idlocal=eq\.(\d+)/)![1]}` : 'select 1 where false')).rows }
+  const dg = await diagnosticar(info!, mensagem, fakeDb as never)
+  assert.equal(dg.valor_recebido, '30/01/0206')
+  assert.match(dg.problema, /ano 0206/)
+  assert.equal(dg.item?.id, 110)
+  assert.equal(dg.lote?.lote, 'LX9')
+  assert.ok(dg.passos.some(p => p.includes('LX9')) && dg.passos.some(p => p.includes('30/01/0206')))
+  await erp.exec(`delete from mercadoria_estoque_lote where _lote = 'LX9'`)
 })
 
 console.log(`\n${passed} testes passaram.`)

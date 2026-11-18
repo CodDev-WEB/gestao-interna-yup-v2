@@ -5,7 +5,7 @@
 // 3 subrequests (ERP + gravação + estado) e o estado é salvo a cada página, então uma execução
 // interrompida continua de onde parou na próxima.
 
-import { convertRow, keyOf, type TypedRow, type Value } from './convert'
+import { convertRow, keyOf, RowError, type TypedRow, type Value } from './convert'
 import { DATASETS, target, type Dataset } from './datasets'
 import { buildSelect } from './sql'
 import type { JobState, Store } from './store'
@@ -173,7 +173,10 @@ export async function runSync(deps: { erp: ErpLike; store: Store }, opts: SyncOp
         summary.error = message
         if (isFatal(e)) { fatal = message; break }
         s.status = 'error'
-        s.last_error = message.slice(0, 2000)
+        // Registro inválido: guarda também onde ele está (tabela, coluna, chaves) para o diagnóstico da tela.
+        s.last_error = e instanceof RowError
+          ? `${message.slice(0, 500)}\n§${JSON.stringify({ ...e.info, valor: String(e.info.valor).slice(0, 200), lidos_no_ciclo: s.rows_cycle })}`.slice(0, 2000)
+          : message.slice(0, 2000)
         s.last_synced_at = now().toISOString()
         if (budget.remaining >= 3) { budget.take(); await deps.store.saveState(s) }
       }

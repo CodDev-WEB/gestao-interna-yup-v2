@@ -1,10 +1,18 @@
 import { useState } from 'react'
 import { api, useApi } from '../api'
 import { haQuanto, int } from '../format'
-import { AlertTriangle, Database, Loader, Power, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Database, Loader, MapPin, Power, RefreshCw, RotateCw, Wrench } from 'lucide-react'
+import { ItemLink } from '../ProdutoPainel'
 import { ErrorState, Loading, Metric, PageHead } from '../ui'
 
-type Job = { dataset: string; kind: string; refresh_minutes: number; description: string; state: { status: string; rows_total: number | string; rows_cycle: number | string; last_synced_at: string | null; last_completed_at: string | null; last_error: string | null; enabled: boolean; cycle_started_at: string | null } | null }
+type Diagnostico = {
+  titulo: string; campo: string; valor_recebido: string; problema: string; onde_corrigir: string; passos: string[]; impacto: string; tecnico: string
+  item?: { id: number; nome: string | null; codigobarras: string | null; secao: string | null; setor: string | null; estoque: number | null }
+  lote?: { lote: string; entrada: string | null; validade: string | null; local: string | null; saldo: number | null }
+  documento?: { id: number; numero: string | null; modelo: string | null; data: string | null }
+  pessoa?: { id: number; nome: string | null }
+}
+type Job = { dataset: string; kind: string; refresh_minutes: number; description: string; diagnostico: Diagnostico | null; state: { status: string; rows_total: number | string; rows_cycle: number | string; last_synced_at: string | null; last_completed_at: string | null; last_error: string | null; enabled: boolean; cycle_started_at: string | null } | null }
 type Run = { id: number; mode: string; status: string; started_at: string; finished_at: string | null; rows_written: number; erp_requests: number; error: string | null }
 type Status = { settings: { auto_enabled: boolean; recent_days: number; updated_at: string } | null; jobs: Job[]; runs: Run[] }
 
@@ -62,13 +70,59 @@ export default function Sincronizacao() {
         <Metric icon={<Loader size={18} />} tone="gold" label="Carregando agora" value={st.jobs.filter(j => j.state?.cycle_started_at).length} detail="conjuntos de dados" />
         <Metric icon={<AlertTriangle size={18} />} tone={erros > 0 ? 'red' : 'blue'} label="Com erro" value={erros} valueClass={erros > 0 ? 'status-bad' : ''} detail={erros > 0 ? 'veja o motivo na tabela' : 'nenhum'} />
       </div>
+      {st.jobs.filter(j => j.diagnostico).length > 0 && (
+        <section className="section" style={{ marginTop: 0, marginBottom: 24 }} aria-labelledby="corrigir-h">
+          <div className="section-head"><div><span className="eyebrow">Leituras paradas</span><h2 id="corrigir-h">O que corrigir no ERP</h2></div></div>
+          <div className="fix-list">
+            {st.jobs.filter(j => j.diagnostico).map(j => {
+              const d = j.diagnostico!
+              return (
+                <article key={j.dataset} className="fix">
+                  <header className="fix-head">
+                    <div className="fix-icon" aria-hidden><Wrench size={18} /></div>
+                    <div>
+                      <span className="eyebrow">{j.description}</span>
+                      <h3>{d.titulo}</h3>
+                      <p className="fix-problema">{d.problema}</p>
+                    </div>
+                    <button className="btn secondary" disabled={!!ocupado} onClick={() => acao(j.dataset, () => api('sync/run', { method: 'POST', body: JSON.stringify({ datasets: [j.dataset] }) }))}>
+                      <RotateCw size={15} aria-hidden />{ocupado === j.dataset ? 'Lendo…' : 'Ler de novo'}
+                    </button>
+                  </header>
+                  <dl className="kv fix-kv">
+                    <div><dt>Campo com erro</dt><dd>{d.campo}</dd></div>
+                    <div><dt>Valor no ERP</dt><dd className="status-bad">{d.valor_recebido}</dd></div>
+                    {d.item && <>
+                      <div><dt>Item</dt><dd><ItemLink id={d.item.id}>{d.item.nome ?? `Produto ${d.item.id}`}</ItemLink></dd></div>
+                      <div><dt>Código interno</dt><dd>{d.item.id}</dd></div>
+                      <div><dt>Código de barras</dt><dd>{d.item.codigobarras ?? '—'}</dd></div>
+                      <div><dt>Seção / setor</dt><dd>{d.item.secao ?? '—'} · {d.item.setor ?? '—'}</dd></div>
+                    </>}
+                    {d.lote && <>
+                      <div><dt>Lote</dt><dd>{d.lote.lote}</dd></div>
+                      <div><dt>Entrada do lote</dt><dd>{d.lote.entrada ?? '—'}</dd></div>
+                      <div><dt>Local / saldo</dt><dd>{d.lote.local ?? '—'}{d.lote.saldo !== null ? ` · ${int(d.lote.saldo)} un.` : ''}</dd></div>
+                    </>}
+                    {d.documento && <div><dt>Documento</dt><dd>{[d.documento.modelo, d.documento.numero && `nº ${d.documento.numero}`].filter(Boolean).join(' ') || `código ${d.documento.id}`}{d.documento.data ? ` · ${d.documento.data}` : ''}</dd></div>}
+                    {d.pessoa && <div><dt>Pessoa</dt><dd>{d.pessoa.nome ?? `código ${d.pessoa.id}`}</dd></div>}
+                  </dl>
+                  <div className="fix-onde"><MapPin size={16} aria-hidden /><div><strong>Onde ajustar:</strong> {d.onde_corrigir}</div></div>
+                  <ol className="fix-passos">{d.passos.map((p, i) => <li key={i}>{p}</li>)}</ol>
+                  <p className="hint" style={{ margin: '10px 0 0' }}>{d.impacto}</p>
+                  <details className="fix-tec"><summary>Mensagem técnica</summary><code>{d.tecnico}</code></details>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      )}
       <div className="table-wrap cards-sm">
         <table>
           <thead><tr><th>Dados</th><th>Situação</th><th className="r">Registros</th><th>Atualização</th><th>Última leitura</th></tr></thead>
           <tbody>
             {st.jobs.map(j => (
               <tr key={j.dataset}>
-                <td className="wrap"><span className="title">{j.description}</span>{j.state?.last_error && <small className="status-bad" style={{ fontWeight: 500 }} title={j.state.last_error}>{erroAmigavel(j.state.last_error)}</small>}</td>
+                <td className="wrap"><span className="title">{j.description}</span>{j.state?.last_error && <small className="status-bad" style={{ fontWeight: 500 }} title={j.state.last_error}>{j.diagnostico ? <a href="#corrigir-h">{j.diagnostico.titulo}: ver o que corrigir</a> : erroAmigavel(j.state.last_error)}</small>}</td>
                 <td data-label="Situação">{statusTxt(j)}</td>
                 <td className="r" data-label="Registros">{int(j.state?.rows_total ?? 0)}</td>
                 <td data-label="Atualização">{intervalo(j.refresh_minutes)}</td>
