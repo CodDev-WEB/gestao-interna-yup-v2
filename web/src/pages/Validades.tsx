@@ -1,7 +1,8 @@
 import { type Page, useApi } from '../api'
 import { brl, brlCurto, data, dec, int } from '../format'
 import { FAIXAS, faixa } from '../labels'
-import { type Col, DataTable, Empty, ErrorState, Loading, SearchBox, useParam, useTableState } from '../ui'
+import { AlertTriangle, CalendarClock, CalendarX, Clock } from 'lucide-react'
+import { type Col, DataTable, Empty, ErrorState, Loading, Metric, PageHead, SearchBox, useParam, useTableState } from '../ui'
 
 type Lote = { idmercadoriavariacao: number; descricao: string | null; lote: string; dtvalidade: string; qtdsaldo: number | string; dias_para_vencer: number; faixa: string; valor_em_risco: number | string | null; venda_media_diaria: number | string | null; dias_para_vender: number | string | null; risco_perda: boolean; idlocalestoque: number; dtentrada: string }
 type Resumo = { faixa: string; lotes: number; valor: number | string; lotes_em_risco: number; valor_em_risco: number | string | null }
@@ -20,28 +21,31 @@ export default function Validades() {
   const r = (id: string) => res?.find(x => x.faixa === id)
 
   const cols: Col<Lote>[] = [
-    { key: 'descricao', label: 'Produto', wrap: true, render: l => <><div>{l.descricao || `Variação ${l.idmercadoriavariacao}`}</div><small style={{ color: 'var(--muted)' }}>Lote {l.lote} · entrada {data(l.dtentrada)}</small></> },
-    { key: 'dias_para_vencer', label: 'Validade', sort: true, render: l => { const f = faixa(l.faixa); return <><span className={f.classe}>{data(l.dtvalidade)}</span><br /><small style={{ color: 'var(--muted)' }}>{l.dias_para_vencer < 0 ? `venceu há ${-l.dias_para_vencer} dias` : `em ${l.dias_para_vencer} dias`}</small></> } },
+    { key: 'descricao', label: 'Produto', wrap: true, render: l => <><span className="title">{l.descricao || `Variação ${l.idmercadoriavariacao}`}</span><small>Lote {l.lote} · entrada {data(l.dtentrada)}</small></> },
+    { key: 'dias_para_vencer', label: 'Validade', sort: true, render: l => { const f = faixa(l.faixa); return <><span className={f.classe}>{data(l.dtvalidade)}</span><small>{l.dias_para_vencer < 0 ? `venceu há ${-l.dias_para_vencer} dias` : `em ${l.dias_para_vencer} dias`}</small></> } },
     { key: 'qtdsaldo', label: 'Saldo', right: true, sort: true, render: l => dec(l.qtdsaldo) },
-    { key: 'valor_em_risco', label: 'Valor (custo)', right: true, sort: true, render: l => brl(l.valor_em_risco) },
-    { key: 'vmd', label: 'Venda por dia', right: true, render: l => dec(l.venda_media_diaria) },
+    { key: 'valor_em_risco', label: 'Valor (custo)', right: true, sort: true, className: 'money', render: l => brl(l.valor_em_risco) },
+    { key: 'vmd', label: 'Venda por dia', right: true, sm: false, render: l => dec(l.venda_media_diaria) },
     { key: 'dpv', label: 'Dias para vender', right: true, render: l => l.dias_para_vender === null ? 'sem venda' : int(l.dias_para_vender) },
-    { key: 'risco', label: 'Risco de perda', render: l => l.risco_perda ? <span className="status-bad">⚠ Não vende a tempo</span> : <span className="status-good">✓ Vende antes</span> },
+    { key: 'risco', label: 'Risco de perda', render: l => l.risco_perda ? <span className="pill bad">Não vende a tempo</span> : <span className="pill good">Vende antes</span> },
   ]
 
   return (
     <>
-      <div className="page-head">
-        <div><h1>Validades</h1><p>Lotes com saldo e vencimento em até 90 dias. O risco considera a venda média dos últimos 90 dias: um lote só está seguro se vende antes de vencer.</p></div>
-      </div>
-      <div className="kpis" style={{ marginBottom: 18 }}>
-        {FAIXAS.slice(0, 4).map(f => (
-          <button key={f.id} className="panel kpi" style={{ textAlign: 'left', cursor: 'pointer', border: fx === f.id ? '1px solid var(--ink)' : undefined }} onClick={() => setFx(fx === f.id ? '' : f.id)} aria-pressed={fx === f.id}>
-            <h3>{f.nome}</h3>
-            <div className={`v ${f.classe}`} style={{ fontWeight: 700 }}>{int(r(f.id)?.lotes ?? 0)} lotes</div>
-            <div className="d">{brlCurto(r(f.id)?.valor ?? 0)} a custo · {int(r(f.id)?.lotes_em_risco ?? 0)} em risco</div>
-          </button>
-        ))}
+      <PageHead section="VALIDADES" title="Validades">
+        Lotes com saldo e vencimento em até 90 dias. O risco considera a venda média dos últimos 90 dias: um lote só está seguro se vende antes de vencer.
+      </PageHead>
+      <div className="metrics" style={{ marginBottom: 18 }}>
+        {FAIXAS.slice(0, 4).map((f, i) => {
+          const n = r(f.id)?.lotes ?? 0
+          const Icon = [CalendarX, AlertTriangle, Clock, CalendarClock][i]
+          return (
+            <Metric key={f.id} icon={<Icon size={18} />} tone={n > 0 ? f.tom as 'red' | 'gold' : 'blue'} label={f.nome}
+              value={`${int(n)} ${n === 1 ? 'lote' : 'lotes'}`} valueClass={n > 0 ? f.classe : ''}
+              detail={`${brlCurto(r(f.id)?.valor ?? 0)} a custo · ${int(r(f.id)?.lotes_em_risco ?? 0)} em risco`}
+              onClick={() => setFx(fx === f.id ? '' : f.id)} pressed={fx === f.id} />
+          )
+        })}
       </div>
       <div className="controls">
         <div className="chips" role="group" aria-label="Filtro de risco">

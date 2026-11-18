@@ -1,7 +1,7 @@
 import { type Page, useApi } from '../api'
 import { brl, data, dec, int, pct } from '../format'
 import { SETORES, SITUACOES, situacao } from '../labels'
-import { type Col, DataTable, Empty, ErrorState, Loading, SearchBox, useParam, useTableState } from '../ui'
+import { type Col, DataTable, Empty, ErrorState, Loading, PageHead, SearchBox, Tabs, useParam, useTableState } from '../ui'
 
 type Produto = {
   idmercadoriavariacao: number; descricao: string | null; codigobarras: string | null; setor: string; secao: string | null; situacao: string
@@ -23,16 +23,16 @@ function Lista() {
   const s = sit ? situacao(sit) : null
 
   const cols: Col<Produto>[] = [
-    { key: 'descricao', label: 'Produto', wrap: true, sort: true, render: r => <><div>{r.descricao || `Variação ${r.idmercadoriavariacao}`}</div><small style={{ color: 'var(--muted)' }}>{r.codigobarras || '—'} · {r.secao || 'sem seção'}</small></> },
+    { key: 'descricao', label: 'Produto', wrap: true, sort: true, render: r => <><span className="title">{r.descricao || `Variação ${r.idmercadoriavariacao}`}</span><small>{r.codigobarras || '—'} · {r.secao || 'sem seção'}</small></> },
     { key: 'situacao', label: 'Situação', render: r => { const x = situacao(r.situacao); return <span className="tag"><i style={{ background: x.cor }} aria-hidden />{x.nome}</span> } },
     { key: 'estoque_atual', label: 'Estoque', right: true, sort: true, render: r => dec(r.estoque_atual) },
-    { key: 'valor_estoque', label: 'Valor (custo)', right: true, sort: true, render: r => brl(r.valor_estoque) },
+    { key: 'valor_estoque', label: 'Valor (custo)', right: true, sort: true, className: 'money', render: r => brl(r.valor_estoque) },
     { key: 'qtd_90d', label: 'Vendido 90d', right: true, sort: true, render: r => dec(r.qtd_90d) },
-    { key: 'faturamento_90d', label: 'Faturamento 90d', right: true, sort: true, render: r => brl(r.faturamento_90d) },
-    { key: 'margem_90d_pct', label: 'Margem 90d', right: true, sort: true, render: r => pct(r.margem_90d_pct) },
-    { key: 'ultima_venda', label: 'Última venda', right: true, sort: true, render: r => data(r.ultima_venda) },
+    { key: 'faturamento_90d', label: 'Faturamento 90d', right: true, sort: true, sm: false, render: r => brl(r.faturamento_90d) },
+    { key: 'margem_90d_pct', label: 'Margem 90d', right: true, sort: true, sm: false, render: r => pct(r.margem_90d_pct) },
+    { key: 'ultima_venda', label: 'Última venda', right: true, sort: true, sm: false, render: r => data(r.ultima_venda) },
     { key: 'dias_sem_venda', label: 'Dias sem venda', right: true, sort: true, render: r => int(r.dias_sem_venda) },
-    { key: 'cobertura_dias', label: 'Cobertura (dias)', right: true, sort: true, render: r => int(r.cobertura_dias) },
+    { key: 'cobertura_dias', label: 'Cobertura (dias)', right: true, sort: true, sm: false, render: r => int(r.cobertura_dias) },
   ]
 
   return (
@@ -40,7 +40,7 @@ function Lista() {
       <div className="controls">
         <div className="chips" role="group" aria-label="Situação">
           <button className="chip" aria-pressed={!sit} onClick={() => setSit('')}>Todas</button>
-          {SITUACOES.map(x => <button key={x.id} className="chip" aria-pressed={sit === x.id} onClick={() => setSit(x.id)} title={x.desc}>{x.nome}</button>)}
+          {SITUACOES.map(x => <button key={x.id} className="chip" aria-pressed={sit === x.id} onClick={() => setSit(x.id)} title={x.desc}><i style={{ background: x.cor }} aria-hidden />{x.nome}</button>)}
         </div>
       </div>
       <div className="controls">
@@ -50,7 +50,7 @@ function Lista() {
         </select>
         <SearchBox value={busca} onChange={setBusca} placeholder="Buscar produto" />
       </div>
-      {s && <p style={{ color: 'var(--ink-2)', margin: '0 0 12px' }}><strong>{s.nome}:</strong> {s.desc}.</p>}
+      {s && <p className="hint"><strong>{s.nome}:</strong> {s.desc}.</p>}
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum produto com esses filtros.</Empty> : (
         <DataTable caption="Produtos" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={r => String(r.idmercadoriavariacao)} />
       )}
@@ -72,7 +72,7 @@ function Declinio() {
   ]
   return (
     <>
-      <p style={{ color: 'var(--ink-2)', marginTop: 0 }}>Unidades vendidas em cada um dos últimos 3 meses fechados, só produtos com queda mês a mês. Estoque zerado indica que a queda pode ser falta de produto, não de procura.</p>
+      <p className="hint">Unidades vendidas em cada um dos últimos 3 meses fechados, só produtos com queda mês a mês. Estoque zerado indica que a queda pode ser falta de produto, não de procura.</p>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum produto com queda nos últimos 3 meses.</Empty> : (
         <DataTable caption="Produtos em declínio" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} rowKey={r => String(r.idmercadoriavariacao)} />
       )}
@@ -84,13 +84,10 @@ export default function Produtos() {
   const [aba, setAba] = useParam('aba', 'lista')
   return (
     <>
-      <div className="page-head">
-        <div><h1>Produtos e estoque</h1><p>Cada variação com estoque, valor a custo, giro dos últimos 90 dias e a situação que pede ação.</p></div>
-        <div className="seg" role="group" aria-label="Visão">
-          <button aria-pressed={aba === 'lista'} onClick={() => setAba('lista')}>Por situação</button>
-          <button aria-pressed={aba === 'declinio'} onClick={() => setAba('declinio')}>Em declínio</button>
-        </div>
-      </div>
+      <PageHead section="PRODUTOS" title="Produtos e estoque"
+        actions={<Tabs label="Visão" value={aba} onChange={setAba} options={[{ id: 'lista', label: 'Por situação' }, { id: 'declinio', label: 'Em declínio' }]} />}>
+        Cada variação com estoque, valor a custo, giro dos últimos 90 dias e a situação que pede ação.
+      </PageHead>
       {aba === 'declinio' ? <Declinio /> : <Lista />}
     </>
   )

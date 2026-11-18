@@ -1,8 +1,10 @@
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { CalendarClock, ChevronRight, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, Truck, Users } from 'lucide-react'
 import './styles.css'
 import { currentUser, logout, onAuthChange } from './api'
+import { Brand } from './ui'
 import Login from './pages/Login'
 import Resumo from './pages/Resumo'
 import Produtos from './pages/Produtos'
@@ -13,13 +15,13 @@ import Setores from './pages/Setores'
 import Sincronizacao from './pages/Sincronizacao'
 
 const NAV = [
-  { to: '/', label: 'Visão geral', end: true },
-  { to: '/produtos', label: 'Produtos e estoque' },
-  { to: '/validades', label: 'Validades' },
-  { to: '/fornecedores', label: 'Fornecedores' },
-  { to: '/clientes', label: 'Clientes' },
-  { to: '/setores', label: 'Setores' },
-  { to: '/sincronizacao', label: 'Sincronização' },
+  { to: '/', label: 'Visão geral', icon: LayoutDashboard, end: true },
+  { to: '/produtos', label: 'Produtos e estoque', icon: Package },
+  { to: '/validades', label: 'Validades', icon: CalendarClock },
+  { to: '/fornecedores', label: 'Fornecedores', icon: Truck },
+  { to: '/clientes', label: 'Clientes', icon: Users },
+  { to: '/setores', label: 'Setores', icon: Shapes },
+  { to: '/sincronizacao', label: 'Sincronização', icon: RefreshCw },
 ]
 
 function App() {
@@ -28,14 +30,20 @@ function App() {
   if (!user) return <Login />
   return (
     <div className="shell">
-      <aside className="rail">
-        <NavLink to="/" className="brand"><span className="brand-dot" aria-hidden /> <span>YUP Intelligence<small>Gestão Yup Petstore</small></span></NavLink>
-        <nav className="nav" aria-label="Seções">
-          {NAV.map(n => <NavLink key={n.to} to={n.to} end={n.end}>{n.label}</NavLink>)}
+      <aside className="sidebar">
+        <NavLink to="/" className="brand" aria-label="YUP Intelligence, ir para a visão geral"><Brand /></NavLink>
+        <div className="sidebar-label">GESTÃO DA LOJA</div>
+        <nav aria-label="Seções">
+          {NAV.map(({ to, label, icon: Icon, end }) => (
+            <NavLink key={to} to={to} end={end}><Icon size={18} aria-hidden />{label}<ChevronRight size={14} className="chev" aria-hidden /></NavLink>
+          ))}
         </nav>
-        <div className="rail-foot">{user}<br /><button onClick={logout}>Sair</button></div>
+        <div className="sidebar-bottom">
+          <span className="sidebar-user">{user}</span>
+          <button onClick={logout} aria-label="Sair"><LogOut size={17} aria-hidden /><span className="sidebar-user-txt">Sair</span></button>
+        </div>
       </aside>
-      <main className="main">
+      <main className="content">
         <Routes>
           <Route path="/" element={<Resumo />} />
           <Route path="/produtos" element={<Produtos />} />

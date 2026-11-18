@@ -1,11 +1,49 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, RotateCw, Search } from 'lucide-react'
+import logo from './assets/logo-yupee.png'
+
+/** Logo Yupee + nome do sistema (mesmo padrão do Gestão à Vista). */
+export function Brand() {
+  return <><img className="brand-logo" src={logo} alt="" /><div><strong>Yup <span>Intelligence</span></strong><small>Gestão interna</small></div></>
+}
+
+/** Cabeçalho de página: trilha, título, descrição e ações. */
+export function PageHead({ section, title, children, actions }: { section?: string; title: string; children?: ReactNode; actions?: ReactNode }) {
+  return (
+    <header className="page-head">
+      <div>
+        <span className="eyebrow">YUP INTELLIGENCE{section ? ` / ${section}` : ''}</span>
+        <h1>{title}</h1>
+        {children && <p>{children}</p>}
+      </div>
+      {actions && <div className="page-actions">{actions}</div>}
+    </header>
+  )
+}
+
+export type Tone = 'gold' | 'green' | 'blue' | 'purple' | 'turquoise' | 'red'
+
+/** Cartão de indicador com ícone, como os do Gestão à Vista. Vira botão quando recebe onClick. */
+export function Metric({ icon, tone = 'turquoise', label, value, detail, valueClass, onClick, pressed }: {
+  icon: ReactNode; tone?: Tone; label: string; value: ReactNode; detail?: ReactNode; valueClass?: string; onClick?: () => void; pressed?: boolean
+}) {
+  const body = <><div className={`metric-icon ${tone}`} aria-hidden>{icon}</div><span className="metric-label">{label}</span><strong className={`metric-value ${valueClass ?? ''}`}>{value}</strong>{detail !== undefined && <span className="metric-detail">{detail}</span>}</>
+  return onClick
+    ? <button type="button" className="metric" onClick={onClick} aria-pressed={pressed}>{body}</button>
+    : <div className="metric">{body}</div>
+}
+
+/** Abas segmentadas (período, visão). */
+export function Tabs<T extends string>({ value, options, onChange, label }: { value: T; options: { id: T; label: string }[]; onChange: (v: T) => void; label: string }) {
+  return <div className="tabs" role="group" aria-label={label}>{options.map(o => <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)}>{o.label}</button>)}</div>
+}
 
 export function Loading({ rows = 4 }: { rows?: number }) {
   return <div className="state" aria-busy="true" aria-label="Carregando">{Array.from({ length: rows }, (_, i) => <div key={i} className="skeleton" style={{ margin: '10px 0', width: `${90 - i * 12}%` }} />)}</div>
 }
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return <div className="state error" role="alert">{message}{onRetry && <> <button className="btn btn-ghost" style={{ marginLeft: 10 }} onClick={onRetry}>Tentar de novo</button></>}</div>
+  return <div className="state error" role="alert"><AlertCircle size={16} style={{ verticalAlign: '-3px', marginRight: 6 }} aria-hidden />{message}{onRetry && <button className="btn secondary" onClick={onRetry}><RotateCw size={15} aria-hidden />Tentar de novo</button>}</div>
 }
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="state">{children}</div>
@@ -24,37 +62,48 @@ export function useParam(name: string, def = ''): [string, (v: string) => void] 
   return [value, set]
 }
 
-export type Col<T> = { key: string; label: string; right?: boolean; wrap?: boolean; sort?: boolean; render: (r: T) => ReactNode }
+/** sm: false esconde a coluna nos cartões do celular (dado secundário). */
+export type Col<T> = { key: string; label: string; right?: boolean; wrap?: boolean; sort?: boolean; sm?: false; className?: string; render: (r: T) => ReactNode }
 
-/** Tabela com ordenação pela coluna e paginação (dados vindos do servidor). */
+/** Tabela com ordenação e paginação do servidor. No celular, cada linha vira um cartão. */
 export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, dir, onSort, rowKey, caption }: {
   cols: Col<T>[]; rows: T[]; total: number; page: number; pageSize: number; onPage: (p: number) => void
   sort?: string; dir?: string; onSort?: (key: string) => void; rowKey: (r: T) => string; caption: string
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize))
+  const sortable = cols.filter(c => c.sort)
+  const Arrow = dir === 'asc' ? ArrowUp : ArrowDown
   return (
     <>
-      <div className="table-wrap">
+      {onSort && sortable.length > 0 && (
+        <label className="sort-sm">Ordenar por
+          <select className="select" value={sort} onChange={e => onSort(e.target.value)}>
+            {sortable.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+          <button type="button" className="btn secondary" onClick={() => sort && onSort(sort)} aria-label={dir === 'asc' ? 'Crescente; inverter' : 'Decrescente; inverter'}><Arrow size={16} aria-hidden /></button>
+        </label>
+      )}
+      <div className="table-wrap cards-sm">
         <table>
-          <caption style={{ position: 'absolute', left: -9999 }}>{caption}</caption>
+          <caption className="sr-only">{caption}</caption>
           <thead>
             <tr>{cols.map(c => (
               <th key={c.key} className={c.right ? 'r' : ''} aria-sort={sort === c.key ? (dir === 'asc' ? 'ascending' : 'descending') : undefined}>
-                {c.sort && onSort ? <button onClick={() => onSort(c.key)}>{c.label}{sort === c.key ? (dir === 'asc' ? ' ▲' : ' ▼') : ''}</button> : c.label}
+                {c.sort && onSort ? <button onClick={() => onSort(c.key)}>{c.label}{sort === c.key && <Arrow size={13} aria-hidden />}</button> : c.label}
               </th>
             ))}</tr>
           </thead>
           <tbody>
-            {rows.map(r => <tr key={rowKey(r)}>{cols.map(c => <td key={c.key} className={[c.right ? 'r' : '', c.wrap ? 'wrap' : ''].join(' ')}>{c.render(r)}</td>)}</tr>)}
+            {rows.map(r => <tr key={rowKey(r)}>{cols.map(c => <td key={c.key} data-label={c.label} className={[c.right ? 'r' : '', c.wrap ? 'wrap' : '', c.sm === false ? 'hide-sm' : '', c.className ?? ''].join(' ').trim() || undefined}>{c.render(r)}</td>)}</tr>)}
           </tbody>
         </table>
       </div>
       <div className="pager">
         <span>{total.toLocaleString('pt-BR')} {total === 1 ? 'item' : 'itens'}</span>
-        <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button className="btn btn-ghost" disabled={page <= 1} onClick={() => onPage(page - 1)}>Anterior</button>
-          Página {page} de {pages}
-          <button className="btn btn-ghost" disabled={page >= pages} onClick={() => onPage(page + 1)}>Próxima</button>
+        <span>
+          <button className="btn secondary" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Página anterior"><ChevronLeft size={16} aria-hidden />Anterior</button>
+          {page} de {pages}
+          <button className="btn secondary" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Próxima página">Próxima<ChevronRight size={16} aria-hidden /></button>
         </span>
       </div>
     </>
@@ -71,12 +120,19 @@ export function useTableState(defSort: string, defDir: 'asc' | 'desc' = 'desc') 
   return { sort, dir, page, onSort, onPage: (p: number) => setPagina(String(p)) }
 }
 
+/** Busca que filtra sozinha enquanto a pessoa digita (Enter aplica na hora). */
 export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   const [v, setV] = useState(value)
+  const last = useRef(value)
+  useEffect(() => { setV(value); last.current = value }, [value])
+  useEffect(() => {
+    const t = setTimeout(() => { const q = v.trim(); if (q !== last.current) { last.current = q; onChange(q) } }, 400)
+    return () => clearTimeout(t)
+  }, [v]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <form role="search" onSubmit={e => { e.preventDefault(); onChange(v.trim()) }} style={{ display: 'flex', gap: 8 }}>
+    <form role="search" className="search" onSubmit={e => { e.preventDefault(); const q = v.trim(); last.current = q; onChange(q) }}>
+      <Search size={17} aria-hidden />
       <input className="input" type="search" value={v} onChange={e => setV(e.target.value)} placeholder={placeholder} aria-label={placeholder} />
-      <button className="btn btn-ghost" type="submit">Buscar</button>
     </form>
   )
 }
