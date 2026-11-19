@@ -65,8 +65,8 @@ h3 { font-size: 14px; }
 .brand small { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; margin-top: 3px; color: #a9b6c3; text-transform: uppercase; }
 
 /* ---------- Estrutura ---------- */
-.shell { min-height: 100vh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
-.sidebar { background: var(--navy); color: #fff; padding: 26px 16px 20px; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.shell { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+.sidebar { background: var(--navy); color: #fff; padding: 26px 16px 20px; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto; }
 .sidebar .brand { padding: 0 8px 32px; color: #fff; }
 .sidebar-label { font-size: 11px; color: #9fb0c0; letter-spacing: 1.4px; font-weight: 700; padding: 0 10px; margin-bottom: 10px; }
 .sidebar nav { display: flex; flex-direction: column; gap: 4px; }
@@ -219,8 +219,8 @@ td.money { font-weight: 700; color: var(--ink); }
 .chart-tip strong { display: block; margin-bottom: 2px; color: var(--ink); }
 
 /* ---------- Login ---------- */
-.login-page { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; background: #fff; }
-.login-side { background: var(--navy); color: #fff; padding: 42px clamp(30px, 6vw, 90px); display: flex; flex-direction: column; justify-content: space-between; min-height: 100vh; }
+.login-page { min-height: 100vh; min-height: 100dvh; display: grid; grid-template-columns: 1fr 1fr; background: #fff; }
+.login-side { background: var(--navy); color: #fff; padding: 42px clamp(30px, 6vw, 90px); display: flex; flex-direction: column; justify-content: space-between; min-height: 100vh; min-height: 100dvh; }
 .login-side .brand { color: #fff; }
 .login-message { max-width: 500px; margin: auto 0; }
 .login-message .eyebrow { color: var(--turquoise); }
@@ -617,4 +617,21 @@ button.metric[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--turquoise
 @media (max-width: 760px) {
   .sidebar nav a, .nav-toggle, .tabs button, .chip { min-height: 44px; }
   .sub-tabs a { min-height: 44px; display: inline-flex; align-items: center; }
+}
+
+/* ---------- UI/UX Pro Max: navegação por teclado, toque e leitura ---------- */
+/* skip-links: primeiro Tab da página pula o menu. */
+.skip-link { position: absolute; left: 12px; top: -60px; z-index: 100; background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-weight: 600; text-decoration: none; }
+.skip-link:focus { top: 12px; }
+/* O conteúdo recebe foco ao trocar de página (tabIndex -1); não é controle, então sem contorno. */
+.content:focus { outline: none; }
+/* tap-delay: sem atraso de toque duplo em controles. */
+a, button, .chip, .tabs button, summary { touch-action: manipulation; }
+/* heading-line-balance: títulos curtos quebram em linhas equilibradas (onde o navegador suporta). */
+h1, h2, h3 { text-wrap: balance; }
+@media (max-width: 760px) {
+  /* readable-font-size: 16px nos campos evita o zoom automático do iPhone ao tocar. */
+  .input, .select { font-size: 16px; }
+  /* focus-not-obscured: o menu fixo no topo não cobre o elemento focado. */
+  html { scroll-padding-top: 128px; }
 }

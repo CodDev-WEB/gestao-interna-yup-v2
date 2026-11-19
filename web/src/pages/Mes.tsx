@@ -143,7 +143,7 @@ export default function Mes() {
 
       <div className="section">
         <Painel titulo="Entrou × saiu nos últimos 12 meses" sub="Compras para o estoque, custo do que foi vendido e faturamento líquido. Clique num mês para abrir o resumo dele.">
-          <div style={{ height: 300 }}>
+          <div style={{ height: 300 }} role="img" aria-label={`Gráfico dos últimos ${hist.length} meses: compras para o estoque e custo do que foi vendido em barras, faturamento líquido em linha. Use o seletor de mês no topo para abrir cada mês.`}>
             <ResponsiveContainer>
               <ComposedChart data={hist} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} onClick={e => { const m = (e as { activeLabel?: string } | null)?.activeLabel; if (m) setMes(m) }}>
                 <CartesianGrid stroke="var(--grid)" vertical={false} />

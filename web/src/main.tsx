@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { CalendarClock, CalendarRange, ChevronRight, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, Truck, Users } from 'lucide-react'
@@ -52,9 +52,19 @@ function ItemMenu({ item }: { item: ItemNav }) {
 function App() {
   const [user, setUser] = useState(currentUser())
   useEffect(() => onAuthChange(() => setUser(currentUser())), [])
+  // Ao trocar de página, o foco vai para o conteúdo (leitor de tela anuncia a nova tela).
+  // Só o caminho conta: filtros na URL não movem o foco.
+  const { pathname } = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+  const primeira = useRef(true)
+  useEffect(() => {
+    if (primeira.current) { primeira.current = false; return }
+    mainRef.current?.focus({ preventScroll: true })
+  }, [pathname])
   if (!user) return <Login />
   return (
     <div className="shell">
+      <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
       <aside className="sidebar">
         <NavLink to="/" className="brand" aria-label="YUP Intelligence, ir para a visão geral"><Brand /></NavLink>
         <div className="sidebar-label">Gestão da loja</div>
@@ -66,7 +76,7 @@ function App() {
           <button onClick={logout} aria-label="Sair"><LogOut size={17} aria-hidden /><span className="sidebar-user-txt">Sair</span></button>
         </div>
       </aside>
-      <main className="content">
+      <main className="content" id="conteudo" ref={mainRef} tabIndex={-1}>
         <Routes>
           <Route path="/" element={<Resumo />} />
           <Route path="/mes" element={<Mes />} />
