@@ -6,7 +6,7 @@ Central de inteligência gerencial da **Yup Petstore**: estoque, vendas, validad
 Santarém Sistemas (API de consulta SQL, 20 req/min, até 100 linhas por página)
         │  POST /publica/api/consulta/sql/v1  {"sql": "SELECT …"}   (consultas fixas, só SELECT)
         ▼
-Cloudflare Worker  gestao-interna-yup-v2   cron */5 · rotas /api/* (Bearer ADMIN_TOKEN)
+Cloudflare Worker  gestao-interna-yup-v2   cron a cada 1 min · rotas /api/* (Bearer ADMIN_TOKEN)
         ▼
 Supabase (Postgres)
   erp_*        espelho tipado das tabelas do ERP (25 jobs, 22 tabelas)
@@ -26,6 +26,9 @@ Supabase (Postgres)
 | Fornecedores | Total comprado, participação, ticket; preços de compra e aumentos |
 | Clientes | Segmentos (VIP, recorrentes, em risco, inativos...), recência, próxima compra prevista |
 | Setores | Alimentação, Farmácia e Diversos mês a mês; classificação das seções do ERP |
+| Compras | Itens no ponto de pedido, estoque de segurança, máximo e quantidade sugerida por classe ABC (`docs/compras.md`) |
+| Conciliação | Contagem cíclica pelo celular (A mensal, B trimestral, C anual) e acurácia do estoque (`docs/contagem.md`) |
+| Qualidade do dado | Estoque negativo, sem custo, sem código de barras, sem NCM e lote vencido com saldo, classe A primeiro |
 | Sincronização | Andamento da cópia do ERP, ligar/desligar o automático, sincronizar agora |
 
 Código em `web/` (React + Vite). O Worker serve `dist/` e a API de leitura `/api/dash/*` (`src/dash.ts`). Publicar: `npm run deploy` (gera o site e faz o deploy).
@@ -51,9 +54,9 @@ Código em `web/` (React + Vite). O Worker serve `dist/` e a API de leitura `/ap
 - **append** (documentos, itens, custos dos itens, históricos): lê só chaves maiores que o cursor; o cursor nunca volta.
 - **recent** (documentos, itens e custos dos últimos `recent_days` dias, padrão 7): relê a janela a cada 3 h para pegar cancelamentos, devoluções e correções.
 
-A leitura é por **keyset** (`WHERE (chave) > (último lido) ORDER BY chave`), então páginas menores que o pedido não pulam nem repetem linhas. Cada execução respeita `SYNC_MAX_SUBREQUESTS` (45; o plano Free do Workers permite 50 por invocação) e salva o estado a cada página: o que não couber continua na próxima execução (cron a cada 5 min). Um job com erro de dados não para os outros e espera 15 min para tentar de novo. Credencial inválida ou ERP fora do ar param a execução inteira.
+A leitura é por **keyset** (`WHERE (chave) > (último lido) ORDER BY chave`), então páginas menores que o pedido não pulam nem repetem linhas. Cada execução respeita `SYNC_MAX_SUBREQUESTS` (45; o plano Free do Workers permite 50 por invocação) e salva o estado a cada página: o que não couber continua na próxima execução (cron a cada minuto, cerca de 13 páginas por execução, abaixo do limite de 18 consultas/min do cliente do ERP). Um job com erro de dados não para os outros e espera 15 min para tentar de novo. Credencial inválida ou ERP fora do ar param a execução inteira.
 
-**Volume real (17/11/2026):** ~944 mil registros (104 mil documentos, 242 mil itens, 212 mil linhas de histórico de estoque). O ERP limita a 20 req/min de 100 linhas: a **carga inicial leva ~8–9 h** (`scripts/yup.ps1 carga-completa`). Depois, o cron mantém tudo em dia: documentos novos a cada 5 min, releitura dos últimos 7 dias a cada 12 h, saldos a cada 6 h, lotes a cada 12 h, cadastros, custos e preços diariamente. No plano pago do Workers, suba `SYNC_MAX_SUBREQUESTS` e encurte os intervalos em `datasets.ts`.
+**Volume real (17/11/2026):** ~944 mil registros (104 mil documentos, 242 mil itens, 212 mil linhas de histórico de estoque). O ERP limita a 20 req/min de 100 linhas: a **carga inicial leva ~8–9 h** (`scripts/yup.ps1 carga-completa`). Depois, o cron mantém tudo em dia: documentos novos a cada minuto, releitura dos últimos 7 dias a cada 12 h, saldos a cada 6 h, lotes a cada 12 h, cadastros, custos e preços diariamente. No plano pago do Workers, suba `SYNC_MAX_SUBREQUESTS` e encurte os intervalos em `datasets.ts`.
 
 ## Acesso
 
@@ -94,6 +97,7 @@ Diagnóstico sem expor segredos: `GET /api/health?diag=1`.
 | `POST /api/sync/run` | Executa agora os jobs devidos; `{"datasets": [...]}` força jobs específicos |
 | `POST /api/sync/settings` | `{"auto_enabled": true, "recent_days": 7, "jobs": {"mercadoria_estoque_historico": false}}` |
 | `POST /api/sync/reset` | Recomeça jobs do zero: `{"datasets": ["documento"]}` |
+| `POST /api/dash/contagem` | Registra uma contagem física: `{"idmercadoriavariacao", "qtd_contada", "motivo"?}` (o saldo do sistema é lido no servidor) |
 
 ## Análises (views no Supabase)
 
@@ -108,6 +112,13 @@ Diagnóstico sem expor segredos: `GET /api/health?diag=1`.
 | `vw_cliente_rfm` | Recência, frequência, valor, próxima compra prevista e segmento |
 | `vw_produto_declinio` | Queda de vendas em 3 meses seguidos (com estoque, para separar de ruptura) |
 | `vw_resumo_gestao` | Uma linha com os pontos a atacar |
+| `vw_produto_abc` | Curva ABC pelo faturamento do último ano carregado |
+| `vw_reposicao` | Ponto de pedido, estoque de segurança, máximo e sugestão de compra (parâmetros em `cfg_reposicao`) |
+| `vw_qualidade_dados`, `vw_qualidade_resumo` | Problemas de cadastro e estoque por item e totais |
+| `vw_contagem_pendente`, `vw_contagem_acuracia` | Contagem cíclica (tabela `cnt_contagem`) e acurácia |
+| `vw_custo_servico_mensal` | Relatório de custo-serviço mês a mês |
+
+Definições, fórmulas e metas: `docs/indicadores.md`.
 
 **A validar com a loja:** critério de compra (`tipomovimento='E'`, `tipomovimentofinanceiro='P'`, `status='E'`, modelo ≠ `TM`) e se o custo do item (`documento_mercadoria_custo`) é por unidade de `qtd`. Os critérios de venda e devolução são os mesmos já validados no Gestão à Vista. Itens sem custo aparecem em `itens_sem_custo` (o lucro do dia exclui esses itens).
 

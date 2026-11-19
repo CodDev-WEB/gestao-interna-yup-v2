@@ -310,6 +310,28 @@ await test('views: clientes, setores, declínio e resumo executam', async () => 
   const resumo = await one<Record<string, string>>('select * from vw_resumo_gestao')
   assert.equal(Number(resumo.produtos_sem_saida), 1); assert.equal(Number(resumo.lotes_criticos), 1); assert.equal(Number(resumo.itens_aumento_custo_10pct), 1)
 })
+await test('gestão do estoque: curva ABC, reposição, qualidade, contagem e custo-serviço', async () => {
+  const abc = (await sb.query<{ idmercadoriavariacao: string; classe: string; posicao: string; acumulado_pct: string }>('select * from vw_produto_abc order by posicao')).rows
+  assert.ok(abc.length > 0)
+  assert.equal(abc[0].classe, 'A')
+  assert.equal(Number(abc.at(-1)!.acumulado_pct), 100)
+  for (const r of (await sb.query<Record<string, string>>('select * from vw_reposicao')).rows) {
+    assert.ok(Number(r.ponto_pedido) >= Number(r.estoque_seguranca))
+    assert.ok(Number(r.estoque_maximo) >= Number(r.ponto_pedido))
+    assert.ok(Number(r.sugestao_compra) >= 0)
+  }
+  await sb.query('select * from vw_qualidade_dados')
+  assert.ok((await sb.query('select * from vw_qualidade_resumo')).rows.some(r => (r as { problema: string }).problema === 'venda_sem_custo'))
+  assert.ok(await count(sb, 'select count(*) as n from vw_custo_servico_mensal') > 0)
+  // Contagem: item contado sai da lista do dia; contagem igual ao sistema = 100% de acurácia.
+  const id = Number(abc[0].idmercadoriavariacao)
+  assert.ok(await count(sb, `select count(*) as n from vw_contagem_pendente where idmercadoriavariacao = ${id}`) === 1)
+  await sb.query(`insert into cnt_contagem (idmercadoriavariacao, qtd_contada, qtd_sistema, custo_unitario, classe) values (${id}, 5, 5, 10, 'A')`)
+  assert.ok(await count(sb, `select count(*) as n from vw_contagem_pendente where idmercadoriavariacao = ${id}`) === 0)
+  const ac = await one<Record<string, string>>(`select * from vw_contagem_acuracia where classe = 'A'`)
+  assert.equal(Number(ac.acuracia_pct), 100); assert.equal(Number(ac.contados), 1)
+  await sb.query('delete from cnt_contagem')
+})
 
 await test('classificação por NCM: regra do NCM (prefixo mais longo) > seção > Diversos; árvore de categorias', async () => {
   const c = Object.fromEntries((await sb.query<Record<string, string>>('select idmercadoriavariacao, ncm, capitulo, posicao, setor, origem_setor, ncm_descricao from vw_produto_classe')).rows.map(r => [Number(r.idmercadoriavariacao), r]))

@@ -635,3 +635,27 @@ h1, h2, h3 { text-wrap: balance; }
   /* focus-not-obscured: o menu fixo no topo não cobre o elemento focado. */
   html { scroll-padding-top: 128px; }
 }
+
+/* ---------- Gestão do estoque: classe ABC, indicadores em 5 colunas, contagem pelo celular ---------- */
+.classe-tag { min-width: 24px; justify-content: center; }
+.metrics.metrics-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.count-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.count-item { background: var(--panel); border-radius: var(--r-md); padding: 14px 16px; display: grid; gap: 12px; }
+.count-head { display: flex; gap: 12px; align-items: flex-start; }
+.count-name { min-width: 0; display: grid; gap: 2px; }
+.count-name small { color: var(--muted); font-size: 12px; }
+.count-form { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr) auto; grid-template-areas: 'l1 l2 .' 'q m b' 'e e e'; gap: 6px 12px; align-items: end; }
+.count-form label { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.count-form label:first-of-type { grid-area: l1; } .count-form label:nth-of-type(2) { grid-area: l2; }
+.count-form .input { grid-area: q; font-size: 18px; font-variant-numeric: tabular-nums; }
+.count-form .select { grid-area: m; }
+.count-form .btn { grid-area: b; }
+.count-form .error-box { grid-area: e; margin: 0; }
+.count-result { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0; }
+.count-result .btn { margin-left: auto; }
+@media (max-width: 1100px) { .metrics.metrics-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .count-form { grid-template-columns: 1fr; grid-template-areas: 'l1' 'q' 'l2' 'm' 'b' 'e'; }
+  .count-form .input, .count-form .select, .count-form .btn { min-height: 48px; }
+  .metrics.metrics-5 > .metric:nth-child(n+3) { border-top: 1px solid var(--line); }
+}
