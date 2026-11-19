@@ -85,6 +85,7 @@ export default function Resumo() {
   ].filter(Boolean) as Sugestao[])
   const ordenadas = [...sugestoes.filter(s => s.sev !== 'info').sort((x, y) => y.peso - x.peso), ...sugestoes.filter(s => s.sev === 'info')]
   const principal = ordenadas.find(s => s.frase)
+  const pico = r.serie.length ? r.serie.reduce((m, d) => (d.faturamento > m.faturamento ? d : m), r.serie[0]) : null
 
   return (
     <>
@@ -173,7 +174,7 @@ export default function Resumo() {
         <div className="panel-head">
           <div><h2 id="fat-h">Faturamento por dia</h2><p>{fmtData(r.periodo.inicio)} a {fmtData(r.periodo.fim)}, {int(a.vendas)} vendas, {brl(a.devolucoes)} em devoluções</p></div>
         </div>
-        {r.serie.every(d => d.faturamento === 0) ? <div className="state">{semVendas ? 'As vendas aparecem aqui assim que a carga do ERP chegar nelas.' : 'Nenhuma venda neste período.'}</div> : <div style={{ height: 280 }}>
+        {r.serie.every(d => d.faturamento === 0) ? <div className="state">{semVendas ? 'As vendas aparecem aqui assim que a carga do ERP chegar nelas.' : 'Nenhuma venda neste período.'}</div> : <div style={{ height: 280 }} role="img" aria-label={`Gráfico de área do faturamento diário de ${fmtData(r.periodo.inicio)} a ${fmtData(r.periodo.fim)}: total de ${brl(a.faturamento)}${pico ? `; maior dia ${fmtData(pico.data)}, com ${brl(pico.faturamento)}` : ''}.`}>
           <ResponsiveContainer>
             <AreaChart data={r.serie} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs><linearGradient id="fat-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--turquoise)" stopOpacity={0.28} /><stop offset="100%" stopColor="var(--turquoise)" stopOpacity={0} /></linearGradient></defs>

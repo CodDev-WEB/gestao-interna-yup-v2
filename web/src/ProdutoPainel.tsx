@@ -349,7 +349,7 @@ export default function ProdutoPainel() {
     const antes = document.activeElement as HTMLElement | null
     document.body.style.overflow = 'hidden'
     // Menu e página ficam inertes: o Tab não sai do painel e o leitor de tela só lê a ficha.
-    const fundo = Array.from(document.querySelectorAll<HTMLElement>('.shell > .sidebar, .shell > .content'))
+    const fundo = Array.from(document.querySelectorAll<HTMLElement>('.shell > .skip-link, .shell > .sidebar, .shell > .content'))
     fundo.forEach(el => el.setAttribute('inert', ''))
     fechar.current?.focus()
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
