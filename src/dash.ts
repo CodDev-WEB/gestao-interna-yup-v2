@@ -82,7 +82,7 @@ function faltaGestao(e: unknown) {
 async function comClasse(db: Supabase, rows: Record<string, unknown>[]) {
   const ids = [...new Set(rows.map(r => Number(r.idmercadoriavariacao)).filter(Number.isSafeInteger))]
   if (!ids.length) return rows
-  const abc = await db.select<{ idmercadoriavariacao: number; classe: string }>('vw_produto_abc', `idmercadoriavariacao=in.(${ids.join(',')})&select=idmercadoriavariacao,classe`).catch(() => null)
+  const abc = await db.select<{ idmercadoriavariacao: number; classe: string }>('mv_produto_abc', `idmercadoriavariacao=in.(${ids.join(',')})&select=idmercadoriavariacao,classe`).catch(() => null)
   if (!abc) return rows
   const classe = new Map(abc.map(a => [Number(a.idmercadoriavariacao), a.classe]))
   return rows.map(r => ({ ...r, classe: classe.get(Number(r.idmercadoriavariacao)) ?? 'C' }))
@@ -261,7 +261,7 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
     // Curva ABC: quantos itens e quanto do faturamento em cada classe, e a curva de Pareto resumida.
     case 'abc': {
       try {
-        const rows = await db.selectAll<{ posicao: number; acumulado_pct: Num; participacao_pct: Num; faturamento: Num; classe: string; referencia: string }>('vw_produto_abc', 'select=posicao,acumulado_pct,participacao_pct,faturamento,classe,referencia&order=posicao.asc')
+        const rows = await db.selectAll<{ posicao: number; acumulado_pct: Num; participacao_pct: Num; faturamento: Num; classe: string; referencia: string }>('mv_produto_abc', 'select=posicao,acumulado_pct,participacao_pct,faturamento,classe,referencia&order=posicao.asc')
         const total = rows.length
         const classes = CLASSES.map(c => {
           const r = rows.filter(x => x.classe === c)
@@ -308,10 +308,12 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       // Só dígitos (leitor de código de barras): procura pelo EAN exato; senão, pela descrição.
       const filtro = (cls ? `&classe=eq.${cls}` : '') + (/^\d{6,14}$/.test(s) ? `&codigobarras=eq.${s}` : s ? ilike('descricao', s) : '')
       try {
-        const [lista, a, b, c] = await Promise.all([
+        const [lista, resumo] = await Promise.all([
           db.select('vw_contagem_pendente', `select=*${filtro}&order=prioridade.asc,posicao.asc,valor_estoque.desc.nullslast&limit=${limit}`),
-          db.count('vw_contagem_pendente', 'classe=eq.A'), db.count('vw_contagem_pendente', 'classe=eq.B'), db.count('vw_contagem_pendente', 'classe=eq.C'),
+          db.select<{ classe: string; pendentes: Num }>('vw_contagem_resumo', 'select=classe,pendentes'),
         ])
+        const qtd = (k: string) => n(resumo.find(r => r.classe === k)?.pendentes ?? 0)
+        const a = qtd('A'), b = qtd('B'), c = qtd('C')
         return { lista, pendentes: { A: a, B: b, C: c }, por_dia: { A: Math.ceil(a / 22), B: Math.ceil(b / 66), C: Math.ceil(c / 264) } }
       } catch (e) { throw faltaGestao(e) }
     }
@@ -377,7 +379,7 @@ export async function salvarContagem(db: Supabase, body: Record<string, unknown>
   const obs = typeof body.observacao === 'string' ? body.observacao.trim().slice(0, 300) : null
   const [item] = await db.select<{ estoque_atual: Num; custo_unitario: Num }>('vw_produto_desempenho', `idmercadoriavariacao=eq.${id}&select=estoque_atual,custo_unitario`)
   if (!item) throw new DashError('Item não encontrado.')
-  const [abc] = await db.select<{ classe: string }>('vw_produto_abc', `idmercadoriavariacao=eq.${id}&select=classe`).catch(e => { throw faltaGestao(e) })
+  const [abc] = await db.select<{ classe: string }>('mv_produto_abc', `idmercadoriavariacao=eq.${id}&select=classe`).catch(e => { throw faltaGestao(e) })
   const [salvo] = await db.insert<Record<string, unknown>>('cnt_contagem', {
     idmercadoriavariacao: id, qtd_contada: qtd, qtd_sistema: n(item.estoque_atual), custo_unitario: item.custo_unitario === null ? null : n(item.custo_unitario),
     classe: abc?.classe ?? 'C', motivo, observacao: obs || null, contado_por: quem.slice(0, 120),
