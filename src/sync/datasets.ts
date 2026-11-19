@@ -94,8 +94,14 @@ function ds(name: string, table: keyof typeof C, kind: Kind, refreshMinutes: num
 
 const docWindow = (from: string) => `t._iddocumento IN (SELECT d._iddocumento FROM documento d WHERE d.datahora >= ${from})`
 
-/** Ordem = prioridade de execução: cadastros pequenos primeiro, depois saldos, depois o histórico grande. */
+/**
+ * Ordem = prioridade de execução. Dados transacionais vêm primeiro para que snapshots longos
+ * não impeçam a chegada de documentos, itens e custos novos.
+ */
 export const DATASETS: Dataset[] = [
+  ds('documento', 'documento', 'append', 5, 'Documentos novos (vendas, compras, devoluções...)'),
+  ds('documento_mercadoria', 'documento_mercadoria', 'append', 5, 'Itens dos documentos novos'),
+  ds('documento_mercadoria_custo', 'documento_mercadoria_custo', 'append', 5, 'Custo dos itens dos documentos novos'),
   ds('mercadoria_secao', 'mercadoria_secao', 'snapshot', 1440, 'Seções (setores) das mercadorias'),
   ds('mercadoria_grupo', 'mercadoria_grupo', 'snapshot', 1440, 'Grupos das mercadorias'),
   ds('mercadoria_subgrupo', 'mercadoria_subgrupo', 'snapshot', 1440, 'Subgrupos das mercadorias'),
@@ -114,9 +120,6 @@ export const DATASETS: Dataset[] = [
   ds('mercadoria_tabela_preco', 'mercadoria_tabela_preco', 'snapshot', 1440, 'Preços de venda atuais'),
   ds('inventario', 'inventario', 'snapshot', 360, 'Inventários'),
   ds('inventario_mercadoria', 'inventario_mercadoria', 'snapshot', 1440, 'Contagens de inventário'),
-  ds('documento', 'documento', 'append', 5, 'Documentos novos (vendas, compras, devoluções...)'),
-  ds('documento_mercadoria', 'documento_mercadoria', 'append', 5, 'Itens dos documentos novos'),
-  ds('documento_mercadoria_custo', 'documento_mercadoria_custo', 'append', 5, 'Custo dos itens dos documentos novos'),
   ds('documento_recente', 'documento', 'recent', 720, 'Relê documentos dos últimos dias (status e cancelamentos)', from => `t.datahora >= ${from}`),
   ds('documento_mercadoria_recente', 'documento_mercadoria', 'recent', 720, 'Relê itens dos documentos dos últimos dias', docWindow),
   ds('documento_mercadoria_custo_recente', 'documento_mercadoria_custo', 'recent', 720, 'Relê custos dos itens dos últimos dias', docWindow),
