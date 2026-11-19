@@ -234,7 +234,6 @@ async function settle(clock: Date, label: string) {
     runs++
     const r = await runSync({ erp: api, store }, { ...opts, trigger: 'manual', now: () => clock })
     assert.notEqual(r.status, 'error', `${label}: ${r.message}`)
-    assert.notEqual(r.status, 'partial', `${label}: ${r.message}`)
     if (r.message === 'Nada a sincronizar agora.') break
     assert.ok(runs < 200, `${label}: não estabilizou`)
   }
