@@ -65,9 +65,11 @@ export function useParam(name: string, def = ''): [string, (v: string) => void] 
 export type Col<T> = { key: string; label: string; right?: boolean; wrap?: boolean; sort?: boolean; sm?: false; className?: string; render: (r: T) => ReactNode }
 
 /** Tabela com ordenação e paginação do servidor. No celular, cada linha vira um cartão. */
-export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, dir, onSort, rowKey, caption }: {
+export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, dir, onSort, rowKey, caption, busy }: {
   cols: Col<T>[]; rows: T[]; total: number; page: number; pageSize: number; onPage: (p: number) => void
   sort?: string; dir?: string; onSort?: (key: string) => void; rowKey: (r: T) => string; caption: string
+  /** true enquanto uma nova página/filtro carrega: a tabela atual fica esmaecida. */
+  busy?: boolean
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize))
   const sortable = cols.filter(c => c.sort)
@@ -82,7 +84,7 @@ export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, 
           <button type="button" className="btn secondary" onClick={() => sort && onSort(sort)} aria-label={dir === 'asc' ? 'Crescente; inverter' : 'Decrescente; inverter'}><Arrow size={16} aria-hidden /></button>
         </label>
       )}
-      <div className="table-wrap cards-sm">
+      <div className="table-wrap cards-sm" aria-busy={busy || undefined}>
         <table>
           <caption className="sr-only">{caption}</caption>
           <thead>

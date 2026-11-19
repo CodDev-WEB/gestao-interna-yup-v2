@@ -14,7 +14,7 @@ export default function Clientes() {
   const t = useTableState('valor_total')
   const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
   if (seg) qs.set('segmento', seg); if (busca) qs.set('busca', busca)
-  const { data: p, error, reload } = useApi<Page<Cliente>>(`dash/clientes?${qs}`)
+  const { data: p, error, loading, reload } = useApi<Page<Cliente>>(`dash/clientes?${qs}`)
   const { data: contagem } = useApi<Record<string, number>>('dash/clientes-segmentos')
   const atual = SEGMENTOS.find(s => s.id === seg)
 
@@ -44,7 +44,7 @@ export default function Clientes() {
       </div>
       {atual && <p className="hint"><strong>{atual.nome}:</strong> {atual.desc}.</p>}
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum cliente com esses filtros.</Empty> : (
-        <DataTable caption="Clientes" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={c => String(c.idcliente)} />
+        <DataTable busy={loading} caption="Clientes" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={c => String(c.idcliente)} />
       )}
     </>
   )

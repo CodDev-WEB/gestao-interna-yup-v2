@@ -15,7 +15,7 @@ function Resumo() {
   const t = useTableState('total_comprado')
   const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
   if (busca) qs.set('busca', busca)
-  const { data: p, error, reload } = useApi<Page<Forn>>(`dash/fornecedores?${qs}`)
+  const { data: p, error, loading, reload } = useApi<Page<Forn>>(`dash/fornecedores?${qs}`)
   const cols: Col<Forn>[] = [
     { key: 'nome', label: 'Fornecedor', wrap: true, render: f => <Link to={`/fornecedores?aba=precos&fornecedor=${f.idfornecedor}`} title="Ver preços de compra deste fornecedor" className="title">{f.nome || `Pessoa ${f.idfornecedor}`}</Link> },
     { key: 'total_comprado', label: 'Total comprado', right: true, sort: true, className: 'money', render: f => brl(f.total_comprado) },
@@ -29,7 +29,7 @@ function Resumo() {
     <>
       <div className="controls"><SearchBox value={busca} onChange={setBusca} placeholder="Buscar fornecedor" /></div>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhuma compra encontrada.</Empty> : (
-        <DataTable caption="Fornecedores" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={f => String(f.idfornecedor)} />
+        <DataTable busy={loading} caption="Fornecedores" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={f => String(f.idfornecedor)} />
       )}
     </>
   )
@@ -41,7 +41,7 @@ function Precos() {
   const t = useTableState('variacao_ultima_pct')
   const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
   if (min) qs.set('min', min); if (forn) qs.set('fornecedor', forn)
-  const { data: p, error, reload } = useApi<Page<Preco>>(`dash/precos?${qs}`)
+  const { data: p, error, loading, reload } = useApi<Page<Preco>>(`dash/precos?${qs}`)
   const cols: Col<Preco>[] = [
     { key: 'descricao', label: 'Item', wrap: true, render: x => <><ItemLink id={x.idmercadoriavariacao}>{x.descricao || `Variação ${x.idmercadoriavariacao}`}</ItemLink><small>Fornecedor {x.idfornecedor} · {int(x.compras)} compras</small></> },
     { key: 'penultimo', label: 'Penúltimo preço', right: true, render: x => brl(x.penultimo_preco) },
@@ -63,7 +63,7 @@ function Precos() {
       </div>
       <p className="hint">Preço unitário de compra (total do item ÷ quantidade). Variação compara a última compra com a anterior do mesmo fornecedor.</p>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum item com esses filtros.</Empty> : (
-        <DataTable caption="Preços de compra" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={x => `${x.idfornecedor}-${x.idmercadoriavariacao}`} />
+        <DataTable busy={loading} caption="Preços de compra" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={x => `${x.idfornecedor}-${x.idmercadoriavariacao}`} />
       )}
     </>
   )

@@ -11,5 +11,5 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: { output: { manualChunks: { react: ['react', 'react-dom', 'react-router-dom'], graficos: ['recharts'] } } },
   },
-  server: { proxy: { '/api': { target: 'https://gestao-interna-yup.jordano-19-silva.workers.dev', changeOrigin: true } } },
+  server: { proxy: { '/api': { target: 'https://gestao-interna-yup-v2.jordano-19-silva.workers.dev', changeOrigin: true } } },
 })

@@ -57,7 +57,7 @@ function Lista() {
       </div>
       {s && <p className="hint"><strong>{s.nome}:</strong> {s.desc}.</p>}
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum produto com esses filtros.</Empty> : (
-        <DataTable caption="Produtos" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={r => String(r.idmercadoriavariacao)} />
+        <DataTable busy={loading} caption="Produtos" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={r => String(r.idmercadoriavariacao)} />
       )}
       {loading && p && <span className="sr-only" aria-live="polite">Atualizando</span>}
     </>
@@ -66,7 +66,7 @@ function Lista() {
 
 function Declinio() {
   const t = useTableState('qtd_3_meses_atras')
-  const { data: p, error, reload } = useApi<Page<Declinio>>(`dash/declinio?limit=${PAGE}&offset=${(t.page - 1) * PAGE}`)
+  const { data: p, error, loading, reload } = useApi<Page<Declinio>>(`dash/declinio?limit=${PAGE}&offset=${(t.page - 1) * PAGE}`)
   const cols: Col<Declinio>[] = [
     { key: 'descricao', label: 'Produto', wrap: true, render: r => <ItemLink id={r.idmercadoriavariacao}>{r.descricao || `Variação ${r.idmercadoriavariacao}`}</ItemLink> },
     { key: 'm3', label: 'Há 3 meses', right: true, render: r => dec(r.qtd_3_meses_atras) },
@@ -79,7 +79,7 @@ function Declinio() {
     <>
       <p className="hint">Unidades vendidas em cada um dos últimos 3 meses fechados, só produtos com queda mês a mês. Estoque zerado indica que a queda pode ser falta de produto, não de procura.</p>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum produto com queda nos últimos 3 meses.</Empty> : (
-        <DataTable caption="Produtos em declínio" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} rowKey={r => String(r.idmercadoriavariacao)} />
+        <DataTable busy={loading} caption="Produtos em declínio" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} rowKey={r => String(r.idmercadoriavariacao)} />
       )}
     </>
   )

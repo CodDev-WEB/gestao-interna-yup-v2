@@ -17,7 +17,7 @@ export default function Validades() {
   const t = useTableState('dias_para_vencer', 'asc')
   const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
   if (fx) qs.set('faixa', fx); if (risco) qs.set('risco', '1'); if (busca) qs.set('busca', busca)
-  const { data: p, error, reload } = useApi<Page<Lote>>(`dash/lotes?${qs}`)
+  const { data: p, error, loading, reload } = useApi<Page<Lote>>(`dash/lotes?${qs}`)
   const { data: res } = useApi<Resumo[]>('dash/lotes-resumo')
   const r = (id: string) => res?.find(x => x.faixa === id)
 
@@ -56,7 +56,7 @@ export default function Validades() {
         <SearchBox value={busca} onChange={setBusca} placeholder="Buscar produto" />
       </div>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum lote com esses filtros.</Empty> : (
-        <DataTable caption="Lotes por validade" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={l => `${l.idlocalestoque}-${l.idmercadoriavariacao}-${l.lote}-${l.dtvalidade}-${l.dtentrada}`} />
+        <DataTable busy={loading} caption="Lotes por validade" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={l => `${l.idlocalestoque}-${l.idmercadoriavariacao}-${l.lote}-${l.dtvalidade}-${l.dtentrada}`} />
       )}
     </>
   )

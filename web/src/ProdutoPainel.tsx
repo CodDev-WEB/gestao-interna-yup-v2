@@ -348,10 +348,13 @@ export default function ProdutoPainel() {
     setAba('geral')
     const antes = document.activeElement as HTMLElement | null
     document.body.style.overflow = 'hidden'
+    // Menu e página ficam inertes: o Tab não sai do painel e o leitor de tela só lê a ficha.
+    const fundo = Array.from(document.querySelectorAll<HTMLElement>('.shell > .sidebar, .shell > .content'))
+    fundo.forEach(el => el.setAttribute('inert', ''))
     fechar.current?.focus()
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('keydown', onKey)
-    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); antes?.focus?.() }
+    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); fundo.forEach(el => el.removeAttribute('inert')); antes?.focus?.() }
   }, [valido]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!valido) return null
