@@ -76,6 +76,83 @@ alter table public.erp_local_estoque add column if not exists flaginativo text;
 alter table public.erp_local_estoque enable row level security;
 create index if not exists erp_local_estoque_seen_idx on public.erp_local_estoque (sync_seen_at);
 
+create table if not exists public.erp_documento (
+  _iddocumento bigint not null,
+  sync_seen_at timestamptz not null default now(),
+  sync_deleted_at timestamptz,
+  primary key (_iddocumento)
+);
+alter table public.erp_documento add column if not exists idempresa bigint;
+alter table public.erp_documento add column if not exists idpessoa bigint;
+alter table public.erp_documento add column if not exists idusuario bigint;
+alter table public.erp_documento add column if not exists datahora timestamptz;
+alter table public.erp_documento add column if not exists datahoramovimento timestamptz;
+alter table public.erp_documento add column if not exists numero text;
+alter table public.erp_documento add column if not exists serie text;
+alter table public.erp_documento add column if not exists modelo text;
+alter table public.erp_documento add column if not exists tipomovimento text;
+alter table public.erp_documento add column if not exists tipomovimentoestoque text;
+alter table public.erp_documento add column if not exists tipomovimentofinanceiro text;
+alter table public.erp_documento add column if not exists idnaturezaoperacao bigint;
+alter table public.erp_documento add column if not exists status text;
+alter table public.erp_documento enable row level security;
+create index if not exists erp_documento_seen_idx on public.erp_documento (sync_seen_at);
+create index if not exists erp_documento_ix1 on public.erp_documento (datahora);
+create index if not exists erp_documento_ix2 on public.erp_documento (idpessoa);
+create index if not exists erp_documento_ix3 on public.erp_documento (tipomovimento, tipomovimentofinanceiro, status);
+
+create table if not exists public.erp_documento_mercadoria (
+  _iddocumento bigint not null,
+  _idsequencia bigint not null,
+  sync_seen_at timestamptz not null default now(),
+  sync_deleted_at timestamptz,
+  primary key (_iddocumento, _idsequencia)
+);
+alter table public.erp_documento_mercadoria add column if not exists idmercadoria bigint;
+alter table public.erp_documento_mercadoria add column if not exists idmercadoriavariacao bigint;
+alter table public.erp_documento_mercadoria add column if not exists descricao text;
+alter table public.erp_documento_mercadoria add column if not exists qtd numeric;
+alter table public.erp_documento_mercadoria add column if not exists qtdfator numeric;
+alter table public.erp_documento_mercadoria add column if not exists qtdestoque numeric;
+alter table public.erp_documento_mercadoria add column if not exists qtddevolucao numeric;
+alter table public.erp_documento_mercadoria add column if not exists valunitarioliquido numeric;
+alter table public.erp_documento_mercadoria add column if not exists valtotalbruto numeric;
+alter table public.erp_documento_mercadoria add column if not exists valtotalliquido numeric;
+alter table public.erp_documento_mercadoria add column if not exists valdesconto numeric;
+alter table public.erp_documento_mercadoria add column if not exists valacrescimo numeric;
+alter table public.erp_documento_mercadoria add column if not exists valdescontocashback numeric;
+alter table public.erp_documento_mercadoria add column if not exists idsecao bigint;
+alter table public.erp_documento_mercadoria add column if not exists idgrupo bigint;
+alter table public.erp_documento_mercadoria add column if not exists idsubgrupo bigint;
+alter table public.erp_documento_mercadoria add column if not exists idmarca bigint;
+alter table public.erp_documento_mercadoria add column if not exists idlocalestoque bigint;
+alter table public.erp_documento_mercadoria add column if not exists idpessoafuncionario bigint;
+alter table public.erp_documento_mercadoria add column if not exists lote text;
+alter table public.erp_documento_mercadoria add column if not exists dtvalidade date;
+alter table public.erp_documento_mercadoria add column if not exists flagbonificacao text;
+alter table public.erp_documento_mercadoria add column if not exists iddocumentoorigem bigint;
+alter table public.erp_documento_mercadoria enable row level security;
+create index if not exists erp_documento_mercadoria_seen_idx on public.erp_documento_mercadoria (sync_seen_at);
+create index if not exists erp_documento_mercadoria_ix1 on public.erp_documento_mercadoria (idmercadoriavariacao);
+create index if not exists erp_documento_mercadoria_ix2 on public.erp_documento_mercadoria (idsecao);
+
+create table if not exists public.erp_documento_mercadoria_custo (
+  _iddocumento bigint not null,
+  _idsequencia bigint not null,
+  sync_seen_at timestamptz not null default now(),
+  sync_deleted_at timestamptz,
+  primary key (_iddocumento, _idsequencia)
+);
+alter table public.erp_documento_mercadoria_custo add column if not exists idmercadoriavariacao bigint;
+alter table public.erp_documento_mercadoria_custo add column if not exists valcusto numeric;
+alter table public.erp_documento_mercadoria_custo add column if not exists valcustomedio numeric;
+alter table public.erp_documento_mercadoria_custo add column if not exists valfrete numeric;
+alter table public.erp_documento_mercadoria_custo add column if not exists valipi numeric;
+alter table public.erp_documento_mercadoria_custo add column if not exists valicmsst numeric;
+alter table public.erp_documento_mercadoria_custo add column if not exists valoutroscustos numeric;
+alter table public.erp_documento_mercadoria_custo enable row level security;
+create index if not exists erp_documento_mercadoria_custo_seen_idx on public.erp_documento_mercadoria_custo (sync_seen_at);
+
 create table if not exists public.erp_mercadoria (
   _idmercadoria bigint not null,
   sync_seen_at timestamptz not null default now(),
@@ -246,83 +323,6 @@ alter table public.erp_inventario_mercadoria add column if not exists lote text;
 alter table public.erp_inventario_mercadoria add column if not exists dtvalidade date;
 alter table public.erp_inventario_mercadoria enable row level security;
 create index if not exists erp_inventario_mercadoria_seen_idx on public.erp_inventario_mercadoria (sync_seen_at);
-
-create table if not exists public.erp_documento (
-  _iddocumento bigint not null,
-  sync_seen_at timestamptz not null default now(),
-  sync_deleted_at timestamptz,
-  primary key (_iddocumento)
-);
-alter table public.erp_documento add column if not exists idempresa bigint;
-alter table public.erp_documento add column if not exists idpessoa bigint;
-alter table public.erp_documento add column if not exists idusuario bigint;
-alter table public.erp_documento add column if not exists datahora timestamptz;
-alter table public.erp_documento add column if not exists datahoramovimento timestamptz;
-alter table public.erp_documento add column if not exists numero text;
-alter table public.erp_documento add column if not exists serie text;
-alter table public.erp_documento add column if not exists modelo text;
-alter table public.erp_documento add column if not exists tipomovimento text;
-alter table public.erp_documento add column if not exists tipomovimentoestoque text;
-alter table public.erp_documento add column if not exists tipomovimentofinanceiro text;
-alter table public.erp_documento add column if not exists idnaturezaoperacao bigint;
-alter table public.erp_documento add column if not exists status text;
-alter table public.erp_documento enable row level security;
-create index if not exists erp_documento_seen_idx on public.erp_documento (sync_seen_at);
-create index if not exists erp_documento_ix1 on public.erp_documento (datahora);
-create index if not exists erp_documento_ix2 on public.erp_documento (idpessoa);
-create index if not exists erp_documento_ix3 on public.erp_documento (tipomovimento, tipomovimentofinanceiro, status);
-
-create table if not exists public.erp_documento_mercadoria (
-  _iddocumento bigint not null,
-  _idsequencia bigint not null,
-  sync_seen_at timestamptz not null default now(),
-  sync_deleted_at timestamptz,
-  primary key (_iddocumento, _idsequencia)
-);
-alter table public.erp_documento_mercadoria add column if not exists idmercadoria bigint;
-alter table public.erp_documento_mercadoria add column if not exists idmercadoriavariacao bigint;
-alter table public.erp_documento_mercadoria add column if not exists descricao text;
-alter table public.erp_documento_mercadoria add column if not exists qtd numeric;
-alter table public.erp_documento_mercadoria add column if not exists qtdfator numeric;
-alter table public.erp_documento_mercadoria add column if not exists qtdestoque numeric;
-alter table public.erp_documento_mercadoria add column if not exists qtddevolucao numeric;
-alter table public.erp_documento_mercadoria add column if not exists valunitarioliquido numeric;
-alter table public.erp_documento_mercadoria add column if not exists valtotalbruto numeric;
-alter table public.erp_documento_mercadoria add column if not exists valtotalliquido numeric;
-alter table public.erp_documento_mercadoria add column if not exists valdesconto numeric;
-alter table public.erp_documento_mercadoria add column if not exists valacrescimo numeric;
-alter table public.erp_documento_mercadoria add column if not exists valdescontocashback numeric;
-alter table public.erp_documento_mercadoria add column if not exists idsecao bigint;
-alter table public.erp_documento_mercadoria add column if not exists idgrupo bigint;
-alter table public.erp_documento_mercadoria add column if not exists idsubgrupo bigint;
-alter table public.erp_documento_mercadoria add column if not exists idmarca bigint;
-alter table public.erp_documento_mercadoria add column if not exists idlocalestoque bigint;
-alter table public.erp_documento_mercadoria add column if not exists idpessoafuncionario bigint;
-alter table public.erp_documento_mercadoria add column if not exists lote text;
-alter table public.erp_documento_mercadoria add column if not exists dtvalidade date;
-alter table public.erp_documento_mercadoria add column if not exists flagbonificacao text;
-alter table public.erp_documento_mercadoria add column if not exists iddocumentoorigem bigint;
-alter table public.erp_documento_mercadoria enable row level security;
-create index if not exists erp_documento_mercadoria_seen_idx on public.erp_documento_mercadoria (sync_seen_at);
-create index if not exists erp_documento_mercadoria_ix1 on public.erp_documento_mercadoria (idmercadoriavariacao);
-create index if not exists erp_documento_mercadoria_ix2 on public.erp_documento_mercadoria (idsecao);
-
-create table if not exists public.erp_documento_mercadoria_custo (
-  _iddocumento bigint not null,
-  _idsequencia bigint not null,
-  sync_seen_at timestamptz not null default now(),
-  sync_deleted_at timestamptz,
-  primary key (_iddocumento, _idsequencia)
-);
-alter table public.erp_documento_mercadoria_custo add column if not exists idmercadoriavariacao bigint;
-alter table public.erp_documento_mercadoria_custo add column if not exists valcusto numeric;
-alter table public.erp_documento_mercadoria_custo add column if not exists valcustomedio numeric;
-alter table public.erp_documento_mercadoria_custo add column if not exists valfrete numeric;
-alter table public.erp_documento_mercadoria_custo add column if not exists valipi numeric;
-alter table public.erp_documento_mercadoria_custo add column if not exists valicmsst numeric;
-alter table public.erp_documento_mercadoria_custo add column if not exists valoutroscustos numeric;
-alter table public.erp_documento_mercadoria_custo enable row level security;
-create index if not exists erp_documento_mercadoria_custo_seen_idx on public.erp_documento_mercadoria_custo (sync_seen_at);
 
 create table if not exists public.erp_documento_cancelamento_historico (
   _iddocumento bigint not null,

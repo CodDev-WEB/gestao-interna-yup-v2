@@ -94,7 +94,7 @@ function ds(name: string, table: keyof typeof C, kind: Kind, refreshMinutes: num
 
 const docWindow = (from: string) => `t._iddocumento IN (SELECT d._iddocumento FROM documento d WHERE d.datahora >= ${from})`
 
-/** Ordem = prioridade de execução: cadastros pequenos primeiro, depois saldos, depois o histórico grande. */
+/** Ordem = prioridade de execução: cadastros pequenos, documentos novos, cadastros grandes e saldos, histórico grande. */
 export const DATASETS: Dataset[] = [
   ds('mercadoria_secao', 'mercadoria_secao', 'snapshot', 1440, 'Seções (setores) das mercadorias'),
   ds('mercadoria_grupo', 'mercadoria_grupo', 'snapshot', 1440, 'Grupos das mercadorias'),
@@ -102,6 +102,11 @@ export const DATASETS: Dataset[] = [
   ds('mercadoria_marca', 'mercadoria_marca', 'snapshot', 1440, 'Marcas'),
   ds('natureza_operacao', 'natureza_operacao', 'snapshot', 1440, 'Naturezas de operação (regras de estoque/financeiro)'),
   ds('local_estoque', 'local_estoque', 'snapshot', 1440, 'Locais de estoque'),
+  // Vendas, compras e custos antes dos cadastros grandes: com histórico atrasado ficam com o orçamento até alcançar
+  // o presente; em dia, custam uma consulta por execução e o restante segue para os cadastros.
+  ds('documento', 'documento', 'append', 5, 'Documentos novos (vendas, compras, devoluções...)'),
+  ds('documento_mercadoria', 'documento_mercadoria', 'append', 5, 'Itens dos documentos novos'),
+  ds('documento_mercadoria_custo', 'documento_mercadoria_custo', 'append', 5, 'Custo dos itens dos documentos novos'),
   ds('mercadoria', 'mercadoria', 'snapshot', 1440, 'Cadastro de mercadorias'),
   ds('mercadoria_variacao', 'mercadoria_variacao', 'snapshot', 1440, 'Variações (SKU, embalagem, código de barras)'),
   ds('ncm', 'ncm', 'snapshot', 1440, 'Descrições oficiais dos NCMs usados nos produtos', undefined,
@@ -114,9 +119,6 @@ export const DATASETS: Dataset[] = [
   ds('mercadoria_tabela_preco', 'mercadoria_tabela_preco', 'snapshot', 1440, 'Preços de venda atuais'),
   ds('inventario', 'inventario', 'snapshot', 360, 'Inventários'),
   ds('inventario_mercadoria', 'inventario_mercadoria', 'snapshot', 1440, 'Contagens de inventário'),
-  ds('documento', 'documento', 'append', 5, 'Documentos novos (vendas, compras, devoluções...)'),
-  ds('documento_mercadoria', 'documento_mercadoria', 'append', 5, 'Itens dos documentos novos'),
-  ds('documento_mercadoria_custo', 'documento_mercadoria_custo', 'append', 5, 'Custo dos itens dos documentos novos'),
   ds('documento_recente', 'documento', 'recent', 720, 'Relê documentos dos últimos dias (status e cancelamentos)', from => `t.datahora >= ${from}`),
   ds('documento_mercadoria_recente', 'documento_mercadoria', 'recent', 720, 'Relê itens dos documentos dos últimos dias', docWindow),
   ds('documento_mercadoria_custo_recente', 'documento_mercadoria_custo', 'recent', 720, 'Relê custos dos itens dos últimos dias', docWindow),
