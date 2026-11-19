@@ -117,7 +117,9 @@ await ins('mercadoria_marca', [{ _idmarca: 1, descricao: 'MARCA', flaginativo: '
 await ins('natureza_operacao', [{ _idempresa: 1, _idnatureza: 1, descricao: 'VENDA', tipomovimento: 'S', flagmovimentarestoque: 'S' }])
 await ins('local_estoque', [{ _idempresa: 1, _idlocal: 1, descricao: 'LOJA', flaginativo: 'N' }])
 const produtos: [number, number, number, string][] = [[10, 100, 1, 'RAÇÃO 10KG'], [11, 110, 2, 'VERMÍFUGO'], [12, 120, 1, 'PETISCO PARADO'], [13, 130, 1, 'AREIA'], [99, 999, 1, 'ITEM VOLUME']]
-await ins('mercadoria', produtos.map(([m, , s, desc]) => ({ _idmercadoria: m, descricao: desc, idsecao: s, idgrupo: 1, idsubgrupo: 1, dtalteracao: at(-200) })))
+const NCM: Record<number, string> = { 10: '23091000', 11: '30049099', 12: '23091000', 13: '25081000', 99: '95030099' }
+await ins('mercadoria', produtos.map(([m, , s, desc]) => ({ _idmercadoria: m, descricao: desc, idsecao: s, idgrupo: 1, idsubgrupo: 1, dtalteracao: at(-200), ncm: NCM[m] })))
+await ins('ncm', [{ _ncm: '23091000', descricao: 'ALIMENTOS PARA CAES E GATOS' }, { _ncm: '30049099', descricao: 'OUTROS MEDICAMENTOS' }, { _ncm: '25081000', descricao: 'BENTONITA' }, { _ncm: '95030099', descricao: 'OUTROS BRINQUEDOS' }, { _ncm: '01012100', descricao: 'NAO USADO' }])
 await ins('mercadoria_variacao', produtos.map(([m, v, , desc]) => ({ _idmercadoriavariacao: v, idmercadoria: m, descricao: desc, codigobarras: `789${v}`, embalagem: 'UN' })))
 await ins('pessoa', [
   { _idpessoa: 500, nome: "DISTRIBUIDORA D'OESTE", tipo: 'J', datacadastro: at(-400) },
@@ -247,7 +249,7 @@ let first = { runs: 0, requests: 0 }
 await test('carga inicial completa (páginas curtas, orçamento de 45 subrequests)', async () => {
   first = await settle(t0, 'carga inicial')
   for (const d of mirrorTables()) {
-    const a = await count(erp, `select count(*) as n from ${d.table}`)
+    const a = await count(erp, `select count(*) as n from ${d.table} t${d.filter ? ` where ${d.filter}` : ''}`)
     const b = await count(sb, `select count(*) as n from erp_${d.table} where sync_deleted_at is null`)
     assert.equal(b, a, `erp_${d.table}: ${b} no Supabase, ${a} no ERP`)
   }
@@ -309,6 +311,23 @@ await test('views: clientes, setores, declínio e resumo executam', async () => 
   assert.equal(Number(resumo.produtos_sem_saida), 1); assert.equal(Number(resumo.lotes_criticos), 1); assert.equal(Number(resumo.itens_aumento_custo_10pct), 1)
 })
 
+await test('classificação por NCM: regra do NCM (prefixo mais longo) > seção > Diversos; árvore de categorias', async () => {
+  const c = Object.fromEntries((await sb.query<Record<string, string>>('select idmercadoriavariacao, ncm, capitulo, posicao, setor, origem_setor, ncm_descricao from vw_produto_classe')).rows.map(r => [Number(r.idmercadoriavariacao), r]))
+  assert.equal(c[100].ncm, '23091000'); assert.equal(c[100].capitulo, '23'); assert.equal(c[100].posicao, '2309')
+  assert.equal(c[100].setor, 'Alimentação'); assert.equal(c[100].origem_setor, 'ncm'); assert.equal(c[100].ncm_descricao, 'ALIMENTOS PARA CAES E GATOS')
+  assert.equal(c[110].setor, 'Farmácia'); assert.equal(c[110].origem_setor, 'ncm')
+  // Regra mais específica vence a do capítulo.
+  await sb.exec(`insert into cfg_ncm_setor (prefixo, setor) values ('230910', 'Diversos')`)
+  assert.equal((await one<{ setor: string }>('select setor from vw_produto_classe where idmercadoriavariacao = 100')).setor, 'Diversos')
+  await sb.exec(`delete from cfg_ncm_setor where prefixo = '230910'`)
+  // Sem regra de NCM: vale a seção; sem regra de seção: Diversos (tem NCM).
+  const semRegra = c[130]
+  assert.ok(['secao', 'padrao'].includes(semRegra.origem_setor)); assert.equal(semRegra.posicao, '2508')
+  const arv = (await sb.query<Record<string, string>>('select * from vw_categoria_ncm')).rows
+  assert.ok(arv.some(r => r.ncm === '23091000' && Number(r.produtos) === 2))
+  assert.equal((await one<{ setor: string }>('select setor from vw_produto_desempenho where idmercadoriavariacao = 110')).setor, 'Farmácia')
+  assert.ok(await count(sb, `select count(*) as n from vw_setor_mensal where setor = 'Farmácia'`) > 0)
+})
 await test('resumo do mês: vendas, compras, rankings e histórico batem com as views', async () => {
   const ref = day(-10)
   const ini = ref.slice(0, 8) + '01'

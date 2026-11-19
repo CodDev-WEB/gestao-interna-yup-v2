@@ -39,6 +39,13 @@ function periodo(q: URLSearchParams, padraoDias: number) {
   return { inicio, fim }
 }
 
+/** Tabela/view ainda não criada no Supabase: mensagem que diz o que instalar. */
+function faltaMigracao(e: unknown) {
+  if (e instanceof SupabaseError && /PGRST205|42P01|Could not find|does not exist/.test(e.message))
+    return new DashError('A classificação por NCM ainda não foi instalada no banco. Rode no SQL Editor do Supabase as migrações 20261117010000_erp_mirror.sql, 20261118000000_resumo_mes.sql e 20261120000000_ncm_setores.sql (ou cadastre SUPABASE_DB_URL no GitHub para isso ser automático).')
+  return e
+}
+
 type Num = number | string | null
 const n = (v: Num) => (v === null || v === undefined ? 0 : Number(v))
 
@@ -110,9 +117,16 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
     case 'produtos': {
       const limit = int(q.get('limit'), 50, 1, 200), offset = int(q.get('offset'), 0, 0, 1_000_000)
       const sit = pick(q.get('situacao'), SITUACOES), setor = pick(q.get('setor'), [...SETORES, 'Não classificado']), s = busca(q.get('busca'))
-      const filtro = (sit ? `&situacao=eq.${sit}` : '') + (setor ? `&setor=eq.${encodeURIComponent(setor)}` : '') + (s ? ilike('descricao', s) : '')
+      const ncm = q.get('ncm')
+      const filtroNcm = ncm === 'sem' ? '&ncm=is.null' : ncm && /^\d{2,8}$/.test(ncm) ? `&ncm=like.${ncm}*` : ''
+      const filtro = (sit ? `&situacao=eq.${sit}` : '') + (setor ? `&setor=eq.${encodeURIComponent(setor)}` : '') + (s ? ilike('descricao', s) : '') + filtroNcm
       const cols = ['valor_estoque', 'estoque_atual', 'dias_sem_venda', 'qtd_90d', 'faturamento_90d', 'lucro_90d', 'margem_90d_pct', 'cobertura_dias', 'descricao', 'ultima_venda']
-      const page = await db.selectPage<Record<string, unknown>>('vw_produto_desempenho', `select=*${filtro}${order(q.get('ordem'), cols, 'valor_estoque', q.get('dir'))}`, limit, offset)
+      const consulta = `select=*${filtro}${order(q.get('ordem'), cols, 'valor_estoque', q.get('dir'))}`
+      // Sem a migração do NCM instalada, cai para a view antiga (o filtro por NCM exige a nova).
+      const page = await db.selectPage<Record<string, unknown>>('vw_produto_ncm', consulta, limit, offset).catch(e => {
+        if (!filtroNcm && e instanceof SupabaseError && /vw_produto_ncm|PGRST205|42P01/.test(e.message)) return db.selectPage<Record<string, unknown>>('vw_produto_desempenho', consulta, limit, offset)
+        throw faltaMigracao(e)
+      })
       return { ...page, rows: await comUltimaCompra(db, page.rows) }
     }
 
@@ -163,6 +177,13 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
     case 'secoes':
       return db.select('vw_secao_setor', 'select=*&order=descricao.asc')
 
+    // Árvore setor → grupo (capítulo NCM) → subgrupo (posição) → NCM, com números de estoque e venda.
+    case 'categorias':
+      return db.selectAll('vw_categoria_ncm', 'select=*&order=setor.asc,capitulo.asc.nullslast,posicao.asc,ncm.asc').catch(e => { throw faltaMigracao(e) })
+
+    case 'ncm-regras':
+      return db.select('cfg_ncm_setor', 'select=prefixo,setor&order=prefixo.asc').catch(e => { throw faltaMigracao(e) })
+
     // Resumo do mês: calculado no banco (função resumo_mes), uma chamada só.
     case 'mes': {
       const m = q.get('mes')
@@ -187,6 +208,16 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
     }
   }
   throw new DashError('Consulta desconhecida.')
+}
+
+/** Cria, altera ou remove ({"prefixo", "setor": null}) uma regra de setor por prefixo de NCM. */
+export async function salvarRegraNcm(db: Supabase, body: Record<string, unknown>) {
+  const p = typeof body.prefixo === 'string' ? body.prefixo.replace(/\D/g, '') : ''
+  if (!/^\d{2,8}$/.test(p)) throw new DashError('"prefixo" precisa ter de 2 a 8 dígitos do NCM.')
+  if (body.setor === null) { await db.deleteWhere('cfg_ncm_setor', `prefixo=eq.${p}`); return { ok: true } }
+  if (typeof body.setor !== 'string' || !SETORES.includes(body.setor)) throw new DashError(`"setor" precisa ser um de: ${SETORES.join(', ')} (ou null).`)
+  await db.upsert('cfg_ncm_setor', [{ prefixo: p, setor: body.setor }], 'prefixo')
+  return { ok: true }
 }
 
 /** Classifica uma seção do ERP num setor (ou remove a classificação). */

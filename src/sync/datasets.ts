@@ -28,6 +28,8 @@ export interface Dataset {
   refreshMinutes: number
   /** Só para kind 'recent': filtro da janela; recebe o literal SQL da data inicial ('AAAA-MM-DD'). */
   recentFilter?: (fromLiteral: string) => string
+  /** Filtro fixo (SQL do ERP) aplicado em toda leitura, ex.: só os NCMs usados nos produtos. */
+  filter?: string
   description: string
 }
 
@@ -62,8 +64,9 @@ const C = {
   documento_mercadoria: cols('_iddocumento, _idsequencia, idmercadoria, idmercadoriavariacao, descricao, qtd, qtdfator, qtdestoque, qtddevolucao, valunitarioliquido, valtotalbruto, valtotalliquido, valdesconto, valacrescimo, valdescontocashback, idsecao, idgrupo, idsubgrupo, idmarca, idlocalestoque, idpessoafuncionario, lote, dtvalidade, flagbonificacao, iddocumentoorigem'),
   documento_mercadoria_custo: cols('_iddocumento, _idsequencia, idmercadoriavariacao, valcusto, valcustomedio, valfrete, valipi, valicmsst, valoutroscustos'),
   documento_cancelamento_historico: cols('_iddocumento, datahora, motivo'),
-  mercadoria: cols('_idmercadoria, descricao, referencia, idtipo, idsecao, idgrupo, idsubgrupo, dtalteracao'),
-  mercadoria_variacao: cols('_idmercadoriavariacao, idmercadoria, descricao, referencia, codigobarras, embalagem, marca, idmarca, dtalteracao'),
+  mercadoria: cols('_idmercadoria, descricao, referencia, idtipo, idsecao, idgrupo, idsubgrupo, dtalteracao, ncm, cest'),
+  mercadoria_variacao: cols('_idmercadoriavariacao, idmercadoria, descricao, referencia, codigobarras, embalagem, marca, idmarca, dtalteracao, ncm, cest'),
+  ncm: cols('_ncm, descricao'),
   mercadoria_secao: cols('_idsecao, descricao, flaginativo'),
   mercadoria_grupo: cols('_idgrupo, descricao, flaginativo'),
   mercadoria_subgrupo: cols('_idsubgrupo, descricao, flaginativo'),
@@ -84,9 +87,9 @@ const C = {
 
 const keysOf = (columns: string[]) => columns.filter(c => c.startsWith('_'))
 
-function ds(name: string, table: keyof typeof C, kind: Kind, refreshMinutes: number, description: string, recentFilter?: Dataset['recentFilter']): Dataset {
+function ds(name: string, table: keyof typeof C, kind: Kind, refreshMinutes: number, description: string, recentFilter?: Dataset['recentFilter'], filter?: string): Dataset {
   const columns = C[table]
-  return { name, table, kind, keys: keysOf(columns), columns, refreshMinutes, recentFilter, description }
+  return { name, table, kind, keys: keysOf(columns), columns, refreshMinutes, recentFilter, filter, description }
 }
 
 const docWindow = (from: string) => `t._iddocumento IN (SELECT d._iddocumento FROM documento d WHERE d.datahora >= ${from})`
@@ -101,6 +104,8 @@ export const DATASETS: Dataset[] = [
   ds('local_estoque', 'local_estoque', 'snapshot', 1440, 'Locais de estoque'),
   ds('mercadoria', 'mercadoria', 'snapshot', 1440, 'Cadastro de mercadorias'),
   ds('mercadoria_variacao', 'mercadoria_variacao', 'snapshot', 1440, 'Variações (SKU, embalagem, código de barras)'),
+  ds('ncm', 'ncm', 'snapshot', 1440, 'Descrições oficiais dos NCMs usados nos produtos', undefined,
+    't._ncm IN (SELECT m.ncm FROM mercadoria m WHERE m.ncm IS NOT NULL UNION SELECT v.ncm FROM mercadoria_variacao v WHERE v.ncm IS NOT NULL)'),
   ds('pessoa', 'pessoa', 'snapshot', 1440, 'Clientes, fornecedores e funcionários (sem documentos pessoais)'),
   ds('mercadoria_fornecedor', 'mercadoria_fornecedor', 'snapshot', 1440, 'Fornecedores de cada variação'),
   ds('mercadoria_estoque', 'mercadoria_estoque', 'snapshot', 360, 'Saldo atual por local'),

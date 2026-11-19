@@ -18,9 +18,10 @@ function Lista() {
   const [sit, setSit] = useParam('situacao')
   const [setor, setSetor] = useParam('setor')
   const [busca, setBusca] = useParam('busca')
+  const [ncm, setNcm] = useParam('ncm')
   const t = useTableState('valor_estoque')
   const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
-  if (sit) qs.set('situacao', sit); if (setor) qs.set('setor', setor); if (busca) qs.set('busca', busca)
+  if (sit) qs.set('situacao', sit); if (setor) qs.set('setor', setor); if (busca) qs.set('busca', busca); if (ncm) qs.set('ncm', ncm)
   const { data: p, error, loading, reload } = useApi<Page<Produto>>(`dash/produtos?${qs}`)
   const s = sit ? situacao(sit) : null
 
@@ -52,6 +53,7 @@ function Lista() {
           {[...SETORES, 'Não classificado'].map(x => <option key={x}>{x}</option>)}
         </select>
         <SearchBox value={busca} onChange={setBusca} placeholder="Buscar produto" />
+        {ncm && <button className="chip" aria-pressed onClick={() => setNcm('')} aria-label="Remover filtro de NCM">{ncm === 'sem' ? 'Sem NCM' : `NCM ${ncm}…`} ✕</button>}
       </div>
       {s && <p className="hint"><strong>{s.nome}:</strong> {s.desc}.</p>}
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum produto com esses filtros.</Empty> : (

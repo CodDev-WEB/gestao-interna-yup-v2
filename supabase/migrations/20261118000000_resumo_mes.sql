@@ -75,8 +75,8 @@ begin
   forn_prod as (select p.id, coalesce(u.idfornecedor, f.idfornecedor) as idfornecedor
                   from prod p left join ult_compra u on u.id = p.id left join cad_forn f on f.id = p.id),
   pessoa as (select _idpessoa as id, nullif(trim(concat_ws(' ', vazio_null(nome), vazio_null(sobrenome))), '') as nome from erp_pessoa),
-  secao as (select vi.idsecao, s.descricao, coalesce(cfg.setor, 'Não classificado') as setor, vi.valtotalliquido, vi.lucro_bruto, vi.qtd, vi.iddocumento
-              from v vi left join erp_mercadoria_secao s on s._idsecao = vi.idsecao left join cfg_secao_setor cfg on cfg.idsecao = vi.idsecao)
+  secao as (select vi.idsecao, s.descricao, coalesce(pc.setor, 'Não classificado') as setor, vi.valtotalliquido, vi.lucro_bruto, vi.qtd, vi.iddocumento
+              from v vi left join erp_mercadoria_secao s on s._idsecao = vi.idsecao left join vw_produto_classe pc on pc.idmercadoriavariacao = vi.idmercadoriavariacao)
   select jsonb_build_object(
     'top_faturamento', coalesce((select jsonb_agg(x order by x.faturamento desc) from (
         select id, nome, round(qtd, 3) as qtd, round(faturamento, 2) as faturamento, round(lucro, 2) as lucro, vendas,

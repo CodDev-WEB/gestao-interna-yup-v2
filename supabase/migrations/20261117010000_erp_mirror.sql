@@ -89,6 +89,8 @@ alter table public.erp_mercadoria add column if not exists idsecao bigint;
 alter table public.erp_mercadoria add column if not exists idgrupo bigint;
 alter table public.erp_mercadoria add column if not exists idsubgrupo bigint;
 alter table public.erp_mercadoria add column if not exists dtalteracao timestamptz;
+alter table public.erp_mercadoria add column if not exists ncm text;
+alter table public.erp_mercadoria add column if not exists cest text;
 alter table public.erp_mercadoria enable row level security;
 create index if not exists erp_mercadoria_seen_idx on public.erp_mercadoria (sync_seen_at);
 
@@ -106,9 +108,21 @@ alter table public.erp_mercadoria_variacao add column if not exists embalagem te
 alter table public.erp_mercadoria_variacao add column if not exists marca text;
 alter table public.erp_mercadoria_variacao add column if not exists idmarca bigint;
 alter table public.erp_mercadoria_variacao add column if not exists dtalteracao timestamptz;
+alter table public.erp_mercadoria_variacao add column if not exists ncm text;
+alter table public.erp_mercadoria_variacao add column if not exists cest text;
 alter table public.erp_mercadoria_variacao enable row level security;
 create index if not exists erp_mercadoria_variacao_seen_idx on public.erp_mercadoria_variacao (sync_seen_at);
 create index if not exists erp_mercadoria_variacao_ix1 on public.erp_mercadoria_variacao (idmercadoria);
+
+create table if not exists public.erp_ncm (
+  _ncm text not null,
+  sync_seen_at timestamptz not null default now(),
+  sync_deleted_at timestamptz,
+  primary key (_ncm)
+);
+alter table public.erp_ncm add column if not exists descricao text;
+alter table public.erp_ncm enable row level security;
+create index if not exists erp_ncm_seen_idx on public.erp_ncm (sync_seen_at);
 
 create table if not exists public.erp_pessoa (
   _idpessoa bigint not null,

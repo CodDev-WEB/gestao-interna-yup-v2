@@ -36,6 +36,7 @@ export function literal(type: ColType, value: Value): string {
  */
 export function buildSelect(d: Dataset, cursor: Value[] | null, windowFrom: string | null): string {
   const where: string[] = []
+  if (d.filter) where.push(d.filter)
   if (d.kind === 'recent') {
     if (!windowFrom || !isIsoDate(windowFrom)) throw new Error(`${d.name}: janela sem data inicial.`)
     where.push(d.recentFilter!(literal('date', windowFrom)))

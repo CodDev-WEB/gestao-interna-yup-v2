@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { NavLink } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api, useApi } from '../api'
 import { brl, brlCurto, mes, pct } from '../format'
@@ -49,10 +50,35 @@ function Classificacao({ secoes, error, reload, onSaved }: { secoes: Secao[] | n
   )
 }
 
-export default function Setores() {
-  const { data: linhas, error, reload } = useApi<Linha[]>('dash/setores')
+/** Subabas de Setores (no celular aparecem no topo; no computador ficam no menu lateral). */
+export const SUBABAS_SETORES = [
+  { to: '/setores', label: 'Comparativo', end: true },
+  { to: '/setores/categorias', label: 'Categorias (NCM)' },
+  { to: '/setores/regras', label: 'Regras por NCM' },
+  { to: '/setores/secoes', label: 'Seções do ERP' },
+]
+export function SetoresTabs() {
+  return <nav className="sub-tabs" aria-label="Subabas de Setores">{SUBABAS_SETORES.map(s => <NavLink key={s.to} to={s.to} end={s.end}>{s.label}</NavLink>)}</nav>
+}
+
+/** Seções do ERP: setor usado quando o NCM do produto não tem regra. */
+export function SetoresSecoes() {
   const sec = useApi<Secao[]>('dash/secoes')
   const semSetor = sec.data?.filter(s => !s.setor).length ?? 0
+  return (
+    <>
+      <SetoresTabs />
+      <PageHead section="SETORES / SEÇÕES DO ERP" title="Seções do ERP">
+        Setor usado para os produtos cujo NCM não tem regra em "Regras por NCM". A regra do NCM sempre vence a da seção.
+      </PageHead>
+      {semSetor > 0 && <p className="hint">{semSetor === 1 ? '1 seção está sem setor.' : `${semSetor} seções estão sem setor.`} Produtos dessas seções com NCM ficam em "Diversos"; sem NCM, em "Não classificado".</p>}
+      <Classificacao secoes={sec.data} error={sec.error} reload={sec.reload} onSaved={() => undefined} />
+    </>
+  )
+}
+
+export default function Setores() {
+  const { data: linhas, error, reload } = useApi<Linha[]>('dash/setores')
   const setores = ORDEM.filter(s => linhas?.some(l => l.setor === s))
   const meses = [...new Set((linhas ?? []).map(l => l.mes))].sort()
   const grafico = meses.map(m => Object.fromEntries([['mes', m], ...setores.map(s => [s, Number(linhas!.find(l => l.mes === m && l.setor === s)?.faturamento ?? 0)])]))
@@ -60,15 +86,14 @@ export default function Setores() {
 
   return (
     <>
-      <PageHead section="SETORES" title="Setores">
-        Alimentação, Farmácia e Diversos comparados mês a mês. O setor vem da seção do produto no ERP.
+      <SetoresTabs />
+      <PageHead section="SETORES / COMPARATIVO" title="Setores">
+        Alimentação, Farmácia e Diversos comparados mês a mês. O setor de cada produto vem do NCM (veja "Regras por NCM"); sem regra para o NCM, vale a seção do ERP.
       </PageHead>
-      {semSetor > 0 && (
-        <div className="notice info" role="status">
-          <Shapes size={18} aria-hidden />
-          <div><strong>{semSetor === 1 ? '1 seção do ERP está sem setor.' : `${semSetor} seções do ERP estão sem setor.`}</strong> Sem essa classificação, o comparativo por setor fica incompleto. <a href="#classificar">Classificar agora</a></div>
-        </div>
-      )}
+      <div className="notice info" role="status">
+        <Shapes size={18} aria-hidden />
+        <div>Para ver os produtos por grupo (capítulo do NCM), subgrupo (posição) e NCM, abra <NavLink to="/setores/categorias">Categorias (NCM)</NavLink>. Para mudar em que setor cada NCM entra, use <NavLink to="/setores/regras">Regras por NCM</NavLink>.</div>
+      </div>
       {error ? <ErrorState message={error} onRetry={reload} /> : !linhas ? <Loading /> : linhas.length === 0 ? <Empty>Ainda não há vendas carregadas.</Empty> : (
         <>
           <section className="panel" aria-labelledby="g-h">
@@ -108,11 +133,6 @@ export default function Setores() {
           </section>
         </>
       )}
-      <section className="section" aria-labelledby="c-h" id="classificar">
-        <h2 id="c-h">Classificar seções</h2>
-        <p className="hint" style={{ marginTop: 4 }}>Escolha o setor de cada seção do ERP. A mudança vale na hora para todas as telas.</p>
-        <Classificacao secoes={sec.data} error={sec.error} reload={sec.reload} onSaved={reload} />
-      </section>
     </>
   )
 }
