@@ -141,7 +141,14 @@ export function convertRow(d: Dataset, row: Record<string, unknown>, utcOffset: 
       }
       throw new RowError(`${d.table}.${col} = ${JSON.stringify(raw)}: ${motivo}`, info)
     }
-    if (d.keys.includes(col) && out[col] === null) throw new Error(`${d.table}: chave "${col}" nula`)
+    if (d.keys.includes(col) && out[col] === null) {
+      // Chave vazia (ou "data zero" do ERP, ex.: lote sem validade): registro não pode ser gravado.
+      const registro: Record<string, unknown> = {}
+      for (const c of IDENT) if (d.columns.includes(c)) { const v = pick(row, c); if (v !== undefined && v !== null && v !== '') registro[c] = typeof v === 'string' ? v.slice(0, 120) : v }
+      const info = { tabela: d.table, coluna: col, valor: raw ?? '', motivo: 'vazio', registro }
+      if (avisos && PULAVEIS.has(d.table)) throw new SkipRow({ ...info, chave: `${d.table}|${col}|${JSON.stringify(d.keys.map(k => pick(row, k) ?? null))}`.slice(0, 500), acao: 'ignorado' })
+      throw new RowError(`${d.table}: chave "${col}" nula`, info)
+    }
   }
   return out
 }

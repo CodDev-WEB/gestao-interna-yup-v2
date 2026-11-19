@@ -56,6 +56,7 @@ const dataBr = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split('-');
 
 /** Mostra o valor recebido como a pessoa veria no ERP (datas em dd/mm/aaaa). */
 function valorLegivel(v: string) {
+  if (!v.trim()) return '(vazio)'
   const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})/)
   if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`
   return v.length > 60 ? v.slice(0, 60) + '…' : v
@@ -63,6 +64,7 @@ function valorLegivel(v: string) {
 
 function explicar(info: RowErrorInfo): string {
   const v = String(info.valor ?? '')
+  if (info.motivo === 'vazio') return 'O campo está vazio (ou com a "data zero" do ERP, como 01/01/0001). Ele faz parte da identificação do registro, então precisa estar preenchido.'
   const iso = v.match(/^(\d{4})-(\d{2})-(\d{2})/) ?? v.match(/^(\d{2})\/(\d{2})\/(\d{4})/)
   if (/data/.test(info.motivo) && iso) {
     const [ano, mes, dia] = v.includes('/') ? [Number(iso[3]), Number(iso[2]), Number(iso[1])] : [Number(iso[1]), Number(iso[2]), Number(iso[3])]

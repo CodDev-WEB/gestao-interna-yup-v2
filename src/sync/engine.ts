@@ -124,8 +124,13 @@ async function runJob(d: Dataset, s: JobState, deps: { erp: ErpLike; store: Stor
         avisos.push(e.aviso)
         last = d.keys.map(k => {
           const v = raw[k] ?? raw[k.toUpperCase()]
-          try { return convertValue(columnType(k), v, opts.utcOffset) }
-          catch { const s = String(v).slice(0, 10); if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; throw e }
+          // Valor cru da chave para o marcador de continuação (datas fora do padrão, inclusive "data zero").
+          const s = String(v ?? '').slice(0, 10)
+          let c: Value = null
+          try { c = convertValue(columnType(k), v, opts.utcOffset) } catch { /* abaixo */ }
+          if (c === null && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+          if (c === null) throw e
+          return c
         })
         continue
       }

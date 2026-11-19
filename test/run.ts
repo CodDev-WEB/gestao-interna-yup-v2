@@ -389,7 +389,7 @@ await test('data impossível em campo secundário não para a leitura: fica em b
   await erp.exec(`alter table mercadoria_grupo rename column descricao_x to descricao`)
   // Lote com validade no ano 0206 (a validade é chave do lote) e um lote válido depois dele na ordem da chave.
   await erp.exec(`insert into mercadoria_estoque_lote (_idempresa, _idlocalestoque, _idmercadoriavariacao, _lote, _dtvalidade, _dtentrada, qtdsaldo, datahora) values
-    (1, 1, 110, 'LX9', '0206-01-30', '${day(-15)}', 7, '${at(0)}'), (1, 1, 120, 'LZ', '${day(90)}', '${day(-15)}', 3, '${at(0)}')`)
+    (1, 1, 110, 'LX9', '0206-01-30', '${day(-15)}', 7, '${at(0)}'), (1, 1, 110, 'LX8', '0001-01-01', '${day(-15)}', 2, '${at(0)}'), (1, 1, 120, 'LZ', '${day(90)}', '${day(-15)}', 3, '${at(0)}')`)
   // Item de nota com validade digitada no ano 0026 (campo secundário).
   await doc({ id: 2000, ...compra, dia: 0, itens: [[1, 120, 5, 25, 5]] })
   await erp.exec(`update documento_mercadoria set dtvalidade = '0026-12-01', lote = 'W1' where _iddocumento = 2000`)
@@ -405,8 +405,13 @@ await test('data impossível em campo secundário não para a leitura: fica em b
   const item = await one<{ dtvalidade: Date | null; lote: string }>('select dtvalidade, lote from erp_documento_mercadoria where _iddocumento = 2000')
   assert.equal(item.dtvalidade, null); assert.equal(item.lote, 'W1')
   const av = (await sb.query<{ tabela: string; coluna: string; acao: string; valor: string; registro: Record<string, unknown> }>('select tabela, coluna, acao, valor, registro from sync_avisos where resolvido_em is null order by tabela')).rows
-  const lote = av.find(a => a.tabela === 'mercadoria_estoque_lote')!, nota = av.find(a => a.tabela === 'documento_mercadoria')!
+  const lote = av.find(a => a.tabela === 'mercadoria_estoque_lote' && a.registro._lote === 'LX9')!, nota = av.find(a => a.tabela === 'documento_mercadoria')!
   assert.equal(lote.acao, 'ignorado'); assert.equal(Number(lote.registro._idmercadoriavariacao), 110); assert.equal(lote.registro._lote, 'LX9')
+  const vazio = av.find(a => a.tabela === 'mercadoria_estoque_lote' && a.registro._lote === 'LX8')
+  assert.ok(vazio, 'lote com data zero deveria virar aviso'); assert.equal(vazio!.acao, 'ignorado')
+  assert.equal(await count(sb, `select count(*) as n from erp_mercadoria_estoque_lote where _lote = 'LX8'`), 0)
+  const dv = await diagnosticar({ ...vazio!, motivo: 'vazio' }, '', { select: async () => [] } as never, 'ignorado')
+  assert.match(dv.problema, /vazio/)
   assert.equal(nota.acao, 'em_branco'); assert.equal(nota.coluna, 'dtvalidade'); assert.equal(Number(nota.registro._iddocumento), 2000)
   // O diagnóstico do aviso diz que a leitura não parou e onde corrigir.
   const fakeDb = { select: async (t: string, q: string) => (await sb.query(t === 'vw_produto_desempenho' ? `select descricao, codigobarras, secao, setor, estoque_atual from vw_produto_desempenho where idmercadoriavariacao = ${q.match(/eq\.(\d+)/)![1]}` : 'select 1 where false')).rows }
