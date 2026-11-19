@@ -3,14 +3,17 @@ name: Validate and deploy YUP Intelligence v2
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Pull requests só validam (tipos, testes, build), em paralelo; push na main valida e publica, um por vez.
 concurrency:
-  group: yup-v2-deploy
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('yup-v2-pr-{0}', github.ref) || 'yup-v2-deploy' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
@@ -42,13 +45,14 @@ jobs:
         run: npm run build
 
       - name: Verify Cloudflare deployment credentials
-        if: ${{ env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '' }}
+        if: ${{ github.event_name != 'pull_request' && (env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '') }}
         run: |
           echo "::error::Deployment blocked: configure CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository Actions secrets."
           exit 1
 
       # Diagnóstico sem expor valores: token ativo, contas visíveis e se CLOUDFLARE_ACCOUNT_ID é uma delas.
       - name: Diagnose Cloudflare token
+        if: github.event_name != 'pull_request'
         run: |
           api() { curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4$1"; }
           echo "Token (user):    $(api /user/tokens/verify | jq -c '{success, status: .result.status, errors: [.errors[].message]}')"
@@ -62,11 +66,13 @@ jobs:
           echo "Ler Worker v2: $(api /accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/gestao-interna-yup-v2/settings | jq -c '{success, errors: [.errors[].message]}')"
 
       - name: Deploy isolated v2 Worker and static assets
+        if: github.event_name != 'pull_request'
         run: npx wrangler deploy --config wrangler.jsonc
 
       # Copia para o Worker os secrets operacionais guardados no GitHub (Settings > Secrets and variables > Actions).
       # Os ausentes só geram aviso; o valor nunca aparece no log.
       - name: Sync operational Worker secrets from GitHub
+        if: github.event_name != 'pull_request'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -85,6 +91,7 @@ jobs:
       # Aplica as migrações (idempotentes) quando a URL de conexão do Postgres estiver nos secrets do GitHub.
       # Tolera espaços, quebras de linha e aspas coladas junto; diagnostica o formato sem mostrar a senha.
       - name: Apply Supabase migrations
+        if: github.event_name != 'pull_request'
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
@@ -110,6 +117,7 @@ jobs:
           echo "Migrações aplicadas."
 
       - name: Smoke test deployed Worker
+        if: github.event_name != 'pull_request'
         run: |
           sleep 5
           curl -fsS https://gestao-interna-yup-v2.jordano-19-silva.workers.dev/api/health | tee /dev/stderr | grep -q '"supabase": true'

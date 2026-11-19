@@ -71,6 +71,43 @@ function Painel({ titulo, sub, children, acoes }: { titulo: string; sub?: string
   )
 }
 
+type CS = { mes: string; vendas: number; faturamento_liquido: number | string; desconto_pct: number | string | null; devolucao_pct: number | string | null; margem_pct: number | string | null; ticket_medio: number | string | null; itens_sem_custo: number; itens_sem_custo_pct: number | string | null; perda_validade: number | string; lotes_vencidos: number }
+
+/** Relatório de custo-serviço (Ballou, cap. 16): venda, margem, descontos, devoluções e perdas mês a mês, lado a lado. */
+function CustoServico() {
+  const { data: d, error } = useApi<CS[]>('dash/custo-servico')
+  if (error || !d?.length) return null
+  return (
+    <section className="panel section" aria-labelledby="cs-h">
+      <h2 id="cs-h">Relatório de custo-serviço</h2>
+      <p>Um mês por linha, do mais recente para o mais antigo. Margem só aparece quando todos os itens vendidos no mês têm custo. Perda por validade é o custo dos lotes que venceram no mês e ainda têm saldo.</p>
+      <div className="table-wrap">
+        <table>
+          <caption className="sr-only">Custo-serviço por mês</caption>
+          <thead><tr><th>Mês</th><th className="r">Faturamento líquido</th><th className="r">Vendas</th><th className="r">Ticket médio</th><th className="r">Margem</th><th className="r">Desconto</th><th className="r">Devolução</th><th className="r">Perda por validade</th><th className="r">Itens sem custo</th></tr></thead>
+          <tbody>{d.map((m, i) => {
+            const ant = d.at(i + 1)
+            const v = ant ? variacao(Number(m.faturamento_liquido), Number(ant.faturamento_liquido)) : null
+            return (
+              <tr key={m.mes}>
+                <td>{fmtMes(m.mes + '-01')}</td>
+                <td className="r"><strong>{brl(m.faturamento_liquido)}</strong>{v !== null && <small className={v >= 0 ? 'up' : 'down'}>{v >= 0 ? '+' : ''}{pct(v)} vs. mês anterior</small>}</td>
+                <td className="r">{int(m.vendas)}</td>
+                <td className="r">{brl(m.ticket_medio)}</td>
+                <td className="r">{m.margem_pct === null ? <span className="muted">sem custo</span> : pct(m.margem_pct)}</td>
+                <td className="r">{pct(m.desconto_pct)}</td>
+                <td className="r">{pct(m.devolucao_pct)}</td>
+                <td className="r">{Number(m.perda_validade) > 0 ? <span className="status-bad">{brl(m.perda_validade)}</span> : brl(0)}{m.lotes_vencidos > 0 && <small>{int(m.lotes_vencidos)} lotes</small>}</td>
+                <td className="r">{m.itens_sem_custo > 0 ? <span className="status-warn">{pct(m.itens_sem_custo_pct)}</span> : '0%'}</td>
+              </tr>
+            )
+          })}</tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 export default function Mes() {
   const [mesSel, setMes] = useParam('mes')
   const [rank, setRank] = useParam('ranking', 'faturamento')
@@ -242,6 +279,7 @@ export default function Mes() {
             extra={x => <>{int(x.vendas)} vendas · ticket {brl(x.ticket_medio)}</>} vazio="Nenhuma venda carregada neste mês." />
         </Painel>
       </div>
+      <CustoServico />
       {loading && <span className="sr-only" aria-live="polite">Atualizando</span>}
     </>
   )

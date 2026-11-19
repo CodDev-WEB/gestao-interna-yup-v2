@@ -1,4 +1,6 @@
+import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { type Page, useApi } from '../api'
+import { AvisoCarga, CLASSES, ClasseTag } from '../gestao'
 import { brl, data, dec, int, pct } from '../format'
 import { SETORES, SITUACOES, situacao } from '../labels'
 import { ItemLink } from '../ProdutoPainel'
@@ -8,7 +10,7 @@ type Produto = {
   idmercadoriavariacao: number; descricao: string | null; codigobarras: string | null; setor: string; secao: string | null; situacao: string
   estoque_atual: number | string; valor_estoque: number | string | null; qtd_90d: number | string; faturamento_90d: number | string
   margem_90d_pct: number | string | null; ultima_venda: string | null; dias_sem_venda: number | null; cobertura_dias: number | string | null
-  ultimo_preco_compra: number | null; ultimo_fornecedor: string | null; ultima_compra: string | null
+  ultimo_preco_compra: number | null; ultimo_fornecedor: string | null; ultima_compra: string | null; classe?: string
 }
 type Declinio = { idmercadoriavariacao: number; descricao: string | null; qtd_3_meses_atras: number | string; qtd_2_meses_atras: number | string; qtd_mes_passado: number | string; variacao_pct: number | string | null; estoque_atual: number | string }
 
@@ -27,6 +29,7 @@ function Lista() {
 
   const cols: Col<Produto>[] = [
     { key: 'descricao', label: 'Produto', wrap: true, sort: true, render: r => <><ItemLink id={r.idmercadoriavariacao}>{r.descricao || `Variação ${r.idmercadoriavariacao}`}</ItemLink><small>{r.codigobarras || '—'} · {r.secao || 'sem seção'}</small></> },
+    { key: 'classe', label: 'Classe', render: r => <ClasseTag classe={r.classe} /> },
     { key: 'situacao', label: 'Situação', render: r => { const x = situacao(r.situacao); return <span className="tag"><i style={{ background: x.cor }} aria-hidden />{x.nome}</span> } },
     { key: 'estoque_atual', label: 'Estoque', right: true, sort: true, render: r => dec(r.estoque_atual) },
     { key: 'valor_estoque', label: 'Valor (custo)', right: true, sort: true, className: 'money', render: r => brl(r.valor_estoque) },
@@ -85,15 +88,64 @@ function Declinio() {
   )
 }
 
+type Abc = { total: number; referencia: string | null; classes: { classe: 'A' | 'B' | 'C'; itens: number; itens_pct: number; faturamento: number; faturamento_pct: number }[]; curva: { posicao: number; itens_pct: number; acumulado_pct: number; classe: string }[] }
+
+/** Curva ABC (Pareto): poucos itens fazem a maior parte do faturamento, e cada classe pede um cuidado. */
+function Curva() {
+  const { data: d, error, reload } = useApi<Abc>('dash/abc')
+  if (error) return <ErrorState message={error} onRetry={reload} />
+  if (!d) return <Loading rows={6} />
+  if (!d.total) return <Empty>Ainda não há vendas carregadas para montar a curva ABC.</Empty>
+  const a = d.classes.find(c => c.classe === 'A')
+  return (
+    <>
+      <AvisoCarga oQue="A curva usa o último ano de vendas já carregado." />
+      <div className="metrics" style={{ marginBottom: 18 }}>
+        {d.classes.map(c => (
+          <div key={c.classe} className="metric">
+            <span className="metric-label">{CLASSES.find(x => x.id === c.classe)?.nome}</span>
+            <strong className="metric-value">{int(c.itens)} itens</strong>
+            <span className="metric-detail">{pct(c.itens_pct, 0)} dos itens · {pct(c.faturamento_pct, 0)} do faturamento</span>
+          </div>
+        ))}
+        <div className="metric">
+          <span className="metric-label">Itens vendidos no ano</span>
+          <strong className="metric-value">{int(d.total)}</strong>
+          <span className="metric-detail">até {data(d.referencia)}</span>
+        </div>
+      </div>
+      <section className="panel" aria-labelledby="pareto-h">
+        <h2 id="pareto-h">{a ? `${pct(a.itens_pct, 0)} dos itens fazem 80% do faturamento` : 'Curva ABC'}</h2>
+        <p>Itens ordenados do que mais vende para o que menos vende. A classe A recebe contagem mensal e nível de serviço de 98%; a B, 95%; a C, 90%.</p>
+        <div style={{ height: 300 }} role="img" aria-label={`Curva ABC: ${a ? `${int(a.itens)} itens da classe A fazem 80% do faturamento` : ''} de ${int(d.total)} itens vendidos.`}>
+          <ResponsiveContainer>
+            <AreaChart data={d.curva} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid stroke="var(--grid)" vertical={false} />
+              <XAxis dataKey="itens_pct" type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} width={44} />
+              <ReferenceLine y={80} stroke="var(--line-2)" strokeDasharray="4 4" label={{ value: 'A até 80%', position: 'insideBottomRight', fill: 'var(--muted)', fontSize: 12 }} />
+              <ReferenceLine y={95} stroke="var(--line-2)" strokeDasharray="4 4" label={{ value: 'B até 95%', position: 'insideBottomRight', fill: 'var(--muted)', fontSize: 12 }} />
+              <Tooltip content={({ active, payload }) => active && payload?.length ? (
+                <div className="chart-tip"><strong>Classe {String(payload[0].payload.classe)}</strong>{pct(Number(payload[0].payload.itens_pct), 1)} dos itens fazem {pct(Number(payload[0].payload.acumulado_pct), 1)} do faturamento</div>
+              ) : null} />
+              <Area type="monotone" dataKey="acumulado_pct" stroke="var(--turquoise-ink)" strokeWidth={2} fill="var(--turquoise-soft)" isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
+    </>
+  )
+}
+
 export default function Produtos() {
   const [aba, setAba] = useParam('aba', 'lista')
   return (
     <>
       <PageHead section="PRODUTOS" title="Produtos e estoque"
-        actions={<Tabs label="Visão" value={aba} onChange={setAba} options={[{ id: 'lista', label: 'Por situação' }, { id: 'declinio', label: 'Em declínio' }]} />}>
+        actions={<Tabs label="Visão" value={aba} onChange={setAba} options={[{ id: 'lista', label: 'Por situação' }, { id: 'abc', label: 'Curva ABC' }, { id: 'declinio', label: 'Em declínio' }]} />}>
         Cada variação com estoque, valor a custo, giro dos últimos 90 dias e a situação que pede ação.
       </PageHead>
-      {aba === 'declinio' ? <Declinio /> : <Lista />}
+      {aba === 'declinio' ? <Declinio /> : aba === 'abc' ? <Curva /> : <Lista />}
     </>
   )
 }

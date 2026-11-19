@@ -67,6 +67,49 @@ async function comUltimaCompra(db: Supabase, rows: Record<string, unknown>[]) {
   })
 }
 
+const CLASSES = ['A', 'B', 'C']
+const PROBLEMAS = ['estoque_negativo', 'sem_custo', 'sem_codigo_barras', 'ncm_invalido', 'lote_vencido']
+const MOTIVOS = ['furto', 'avaria', 'erro_entrada', 'erro_venda', 'vencimento', 'outro']
+
+/** Gestão do estoque (migração 20261121000000_gestao_estoque.sql) ainda não instalada: diz o que fazer. */
+function faltaGestao(e: unknown) {
+  if (e instanceof SupabaseError && /PGRST205|PGRST202|42P01|Could not find|does not exist/.test(e.message))
+    return new DashError('A gestão do estoque (curva ABC, reposição, contagem e qualidade do dado) ainda não foi instalada no banco. Falta aplicar a migração 20261121000000_gestao_estoque.sql (automático quando o secret SUPABASE_DB_URL estiver certo no GitHub).')
+  return e
+}
+
+/** Classe ABC de cada produto da página (itens sem venda no último ano são C). */
+async function comClasse(db: Supabase, rows: Record<string, unknown>[]) {
+  const ids = [...new Set(rows.map(r => Number(r.idmercadoriavariacao)).filter(Number.isSafeInteger))]
+  if (!ids.length) return rows
+  const abc = await db.select<{ idmercadoriavariacao: number; classe: string }>('vw_produto_abc', `idmercadoriavariacao=in.(${ids.join(',')})&select=idmercadoriavariacao,classe`).catch(() => null)
+  if (!abc) return rows
+  const classe = new Map(abc.map(a => [Number(a.idmercadoriavariacao), a.classe]))
+  return rows.map(r => ({ ...r, classe: classe.get(Number(r.idmercadoriavariacao)) ?? 'C' }))
+}
+
+/** Até onde a carga já trouxe os itens das vendas e os custos desses itens (data do documento no cursor de cada job). */
+async function cargaVendas(db: Supabase) {
+  const sync = await db.select<{ dataset: string; status: string; cursor: unknown[] | null }>('sync_state', 'dataset=in.(documento_mercadoria,documento_mercadoria_custo)&select=dataset,status,cursor')
+  const ate = async (dataset: string) => {
+    const s = sync.find(x => x.dataset === dataset)
+    const id = Array.isArray(s?.cursor) ? Number(s!.cursor[0]) : null
+    if (!id || !Number.isSafeInteger(id)) return { status: s?.status ?? null, ate: null as string | null }
+    const [doc] = await db.select<{ datahora: string }>('erp_documento', `_iddocumento=eq.${id}&select=datahora`)
+    return { status: s?.status ?? null, ate: doc ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Belem' }).format(new Date(doc.datahora)) : null }
+  }
+  const [itens, custos] = await Promise.all([ate('documento_mercadoria'), ate('documento_mercadoria_custo')])
+  const emDia = (x: { status: string | null; ate: string | null }) => x.status === 'ok' || (x.ate !== null && x.ate >= addDays(hojeBelem(), -2))
+  return { vendas_ate: itens.ate, custos_ate: custos.ate, vendas_completa: emDia(itens), custos_completa: emDia(custos) }
+}
+
+/** Reduz a curva de Pareto a no máximo `max` pontos (sempre com o primeiro, o último e as viradas de classe). */
+function amostra<T extends { posicao: number; classe: string }>(rows: T[], max = 120) {
+  if (rows.length <= max) return rows
+  const passo = rows.length / max
+  return rows.filter((r, i) => i === 0 || i === rows.length - 1 || r.classe !== rows[i - 1].classe || Math.floor(i / passo) !== Math.floor((i - 1) / passo))
+}
+
 export async function dash(path: string, q: URLSearchParams, db: Supabase): Promise<unknown> {
   switch (path) {
     // Visão executiva: período atual vs anterior, capital por situação e pontos a atacar.
@@ -143,7 +186,7 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
         if (!filtroNcm && e instanceof SupabaseError && /vw_produto_ncm|PGRST205|42P01/.test(e.message)) return db.selectPage<Record<string, unknown>>('vw_produto_desempenho', consulta, limit, offset)
         throw faltaMigracao(e)
       })
-      return { ...page, rows: await comUltimaCompra(db, page.rows) }
+      return { ...page, rows: await comClasse(db, await comUltimaCompra(db, page.rows)) }
     }
 
     case 'lotes': {
@@ -214,6 +257,83 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
     case 'meses':
       return db.select('vw_meses_movimento', 'select=mes,documentos&order=mes.desc').catch(() => [])
 
+    // ---------- Gestão do estoque ----------
+    // Curva ABC: quantos itens e quanto do faturamento em cada classe, e a curva de Pareto resumida.
+    case 'abc': {
+      try {
+        const rows = await db.selectAll<{ posicao: number; acumulado_pct: Num; participacao_pct: Num; faturamento: Num; classe: string; referencia: string }>('vw_produto_abc', 'select=posicao,acumulado_pct,participacao_pct,faturamento,classe,referencia&order=posicao.asc')
+        const total = rows.length
+        const classes = CLASSES.map(c => {
+          const r = rows.filter(x => x.classe === c)
+          return { classe: c, itens: r.length, itens_pct: total ? r.length * 100 / total : 0, faturamento: r.reduce((a, x) => a + n(x.faturamento), 0), faturamento_pct: r.reduce((a, x) => a + n(x.participacao_pct), 0) }
+        })
+        const curva = amostra(rows.map(r => ({ posicao: Number(r.posicao), itens_pct: total ? Number(r.posicao) * 100 / total : 0, acumulado_pct: n(r.acumulado_pct), classe: r.classe })))
+        return { total, referencia: rows[0]?.referencia ?? null, classes, curva }
+      } catch (e) { throw faltaGestao(e) }
+    }
+
+    // Qualidade do dado: lista de problemas por item, do item A de maior valor para baixo.
+    case 'qualidade': {
+      const limit = int(q.get('limit'), 50, 1, 200), offset = int(q.get('offset'), 0, 0, 1_000_000)
+      const prob = pick(q.get('problema'), PROBLEMAS), cls = pick(q.get('classe'), CLASSES), s = busca(q.get('busca'))
+      const filtro = (prob ? `&problema=eq.${prob}` : '') + (cls ? `&classe=eq.${cls}` : '') + (s ? ilike('descricao', s) : '')
+      const ord = pick(q.get('ordem'), ['valor', 'faturamento', 'estoque', 'descricao'])
+      const ordem = ord ? `&order=${ord}.${q.get('dir') === 'asc' ? 'asc' : 'desc'}.nullslast` : '&order=classe.asc,valor.desc.nullslast,faturamento.desc'
+      return db.selectPage('vw_qualidade_dados', `select=*${filtro}${ordem}`, limit, offset).catch(e => { throw faltaGestao(e) })
+    }
+
+    case 'qualidade-resumo': {
+      const [problemas, carga] = await Promise.all([db.select('vw_qualidade_resumo', 'select=*').catch(e => { throw faltaGestao(e) }), cargaVendas(db)])
+      return { problemas, carga }
+    }
+
+    // Sugestão de compra: itens no ponto de pedido ou abaixo, com último preço e fornecedor.
+    case 'reposicao': {
+      const limit = int(q.get('limit'), 50, 1, 200), offset = int(q.get('offset'), 0, 0, 1_000_000)
+      const cls = pick(q.get('classe'), CLASSES), s = busca(q.get('busca'))
+      const filtro = (q.get('todos') === '1' ? '' : '&sugestao_compra=gt.0') + (cls ? `&classe=eq.${cls}` : '') + (q.get('ruptura') === '1' ? '&em_ruptura=is.true' : '') + (s ? ilike('descricao', s) : '')
+      const ord = pick(q.get('ordem'), ['valor_sugestao', 'sugestao_compra', 'venda_media_diaria', 'cobertura_dias', 'estoque', 'descricao'])
+      const ordem = ord ? `&order=${ord}.${q.get('dir') === 'asc' ? 'asc' : 'desc'}.nullslast` : '&order=classe.asc,em_ruptura.desc,venda_media_diaria.desc'
+      const [page, carga, cfg] = await Promise.all([
+        db.selectPage<Record<string, unknown>>('vw_reposicao', `select=*${filtro}${ordem}`, limit, offset).catch(e => { throw faltaGestao(e) }),
+        cargaVendas(db),
+        db.select('cfg_reposicao', 'select=*&order=classe.asc').catch(() => []),
+      ])
+      return { ...page, rows: await comUltimaCompra(db, page.rows), carga, parametros: cfg }
+    }
+
+    // Contagem cíclica: lista do dia (A, depois B, depois C) e o que falta por classe.
+    case 'contagem': {
+      const limit = int(q.get('limit'), 85, 1, 300), s = busca(q.get('busca')), cls = pick(q.get('classe'), CLASSES)
+      // Só dígitos (leitor de código de barras): procura pelo EAN exato; senão, pela descrição.
+      const filtro = (cls ? `&classe=eq.${cls}` : '') + (/^\d{6,14}$/.test(s) ? `&codigobarras=eq.${s}` : s ? ilike('descricao', s) : '')
+      try {
+        const [lista, a, b, c] = await Promise.all([
+          db.select('vw_contagem_pendente', `select=*${filtro}&order=prioridade.asc,posicao.asc,valor_estoque.desc.nullslast&limit=${limit}`),
+          db.count('vw_contagem_pendente', 'classe=eq.A'), db.count('vw_contagem_pendente', 'classe=eq.B'), db.count('vw_contagem_pendente', 'classe=eq.C'),
+        ])
+        return { lista, pendentes: { A: a, B: b, C: c }, por_dia: { A: Math.ceil(a / 22), B: Math.ceil(b / 66), C: Math.ceil(c / 264) } }
+      } catch (e) { throw faltaGestao(e) }
+    }
+
+    // Conciliação: acurácia por mês e classe e as últimas contagens com a diferença para o sistema.
+    case 'conciliacao': {
+      try {
+        const [acuracia, ultimas] = await Promise.all([
+          db.select('vw_contagem_acuracia', 'select=*&order=mes.desc,classe.asc&limit=36'),
+          db.select<Record<string, Num>>('cnt_contagem', 'select=*&order=contado_em.desc&limit=50'),
+        ])
+        const ids = [...new Set(ultimas.map(u => Number(u.idmercadoriavariacao)).filter(Number.isSafeInteger))]
+        const nomes = ids.length ? await db.select<{ idmercadoriavariacao: number; descricao: string | null }>('vw_produto_desempenho', `idmercadoriavariacao=in.(${ids.join(',')})&select=idmercadoriavariacao,descricao`) : []
+        const nome = new Map(nomes.map(x => [Number(x.idmercadoriavariacao), x.descricao]))
+        return { acuracia, ultimas: ultimas.map(u => ({ ...u, descricao: nome.get(Number(u.idmercadoriavariacao)) ?? null, diferenca: n(u.qtd_contada) - n(u.qtd_sistema) })) }
+      } catch (e) { throw faltaGestao(e) }
+    }
+
+    // Relatório de custo-serviço: um mês por linha.
+    case 'custo-servico':
+      return db.select('vw_custo_servico_mensal', 'select=*&order=mes.desc&limit=24').catch(e => { throw faltaGestao(e) })
+
     // Ficha completa de um item (painel que abre ao clicar no produto).
     case 'produto': {
       const id = q.get('id')
@@ -244,4 +364,23 @@ export async function salvarSecao(db: Supabase, body: Record<string, unknown>) {
   if (typeof body.setor !== 'string' || !SETORES.includes(body.setor)) throw new DashError(`"setor" precisa ser um de: ${SETORES.join(', ')} (ou null).`)
   await db.upsert('cfg_secao_setor', [{ idsecao: id, setor: body.setor }], 'idsecao')
   return { ok: true }
+}
+
+/** Registra uma contagem física. O saldo do sistema e o custo são lidos aqui, no momento da contagem. */
+export async function salvarContagem(db: Supabase, body: Record<string, unknown>, quem: string) {
+  const id = body.idmercadoriavariacao
+  if (!Number.isSafeInteger(id) || (id as number) <= 0) throw new DashError('"idmercadoriavariacao" inválido.')
+  const qtd = typeof body.qtd_contada === 'number' ? body.qtd_contada : Number(body.qtd_contada)
+  if (!Number.isFinite(qtd) || qtd < 0 || qtd > 1_000_000) throw new DashError('"qtd_contada" precisa ser um número de 0 a 1.000.000.')
+  const motivo = body.motivo === undefined || body.motivo === null || body.motivo === '' ? null : body.motivo
+  if (motivo !== null && (typeof motivo !== 'string' || !MOTIVOS.includes(motivo))) throw new DashError(`"motivo" precisa ser um de: ${MOTIVOS.join(', ')}.`)
+  const obs = typeof body.observacao === 'string' ? body.observacao.trim().slice(0, 300) : null
+  const [item] = await db.select<{ estoque_atual: Num; custo_unitario: Num }>('vw_produto_desempenho', `idmercadoriavariacao=eq.${id}&select=estoque_atual,custo_unitario`)
+  if (!item) throw new DashError('Item não encontrado.')
+  const [abc] = await db.select<{ classe: string }>('vw_produto_abc', `idmercadoriavariacao=eq.${id}&select=classe`).catch(e => { throw faltaGestao(e) })
+  const [salvo] = await db.insert<Record<string, unknown>>('cnt_contagem', {
+    idmercadoriavariacao: id, qtd_contada: qtd, qtd_sistema: n(item.estoque_atual), custo_unitario: item.custo_unitario === null ? null : n(item.custo_unitario),
+    classe: abc?.classe ?? 'C', motivo, observacao: obs || null, contado_por: quem.slice(0, 120),
+  }).catch(e => { throw faltaGestao(e) })
+  return { ok: true, contagem: salvo, diferenca: qtd - n(item.estoque_atual) }
 }

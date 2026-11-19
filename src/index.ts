@@ -10,7 +10,7 @@ import { convertRow } from './sync/convert'
 import { buildCount, buildSelect } from './sync/sql'
 import { runSync, type SyncOptions } from './sync/engine'
 import { PostgrestStore } from './sync/store'
-import { dash, DashError, salvarRegraNcm, salvarSecao } from './dash'
+import { dash, DashError, salvarContagem, salvarRegraNcm, salvarSecao } from './dash'
 import { diagnosticar, diagnosticarVarios, lerErro } from './sync/diagnostico'
 import { descobrirColunas } from './erp/descoberta'
 
@@ -169,6 +169,10 @@ export default {
       }
       if (route === 'POST /api/dash/ncm-regras') {
         try { return json(await salvarRegraNcm(new Supabase(env), await body(req))) }
+        catch (e) { if (e instanceof DashError) throw new BadRequest(e.message); throw e }
+      }
+      if (route === 'POST /api/dash/contagem') {
+        try { return json(await salvarContagem(new Supabase(env), await body(req), auth.who)) }
         catch (e) { if (e instanceof DashError) throw new BadRequest(e.message); throw e }
       }
       if (route === 'POST /api/dash/secoes') {

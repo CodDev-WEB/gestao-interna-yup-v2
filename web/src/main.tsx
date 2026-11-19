@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { CalendarClock, CalendarRange, ChevronRight, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, Truck, Users } from 'lucide-react'
+import { CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
 import './styles.css'
 import { currentUser, logout, onAuthChange } from './api'
 import { Brand } from './ui'
@@ -17,15 +17,21 @@ import Setores, { SetoresSecoes, SUBABAS_SETORES } from './pages/Setores'
 import SetoresCategorias from './pages/SetoresCategorias'
 import SetoresRegras from './pages/SetoresRegras'
 import Sincronizacao from './pages/Sincronizacao'
+import Compras from './pages/Compras'
+import Conciliacao from './pages/Conciliacao'
+import Qualidade from './pages/Qualidade'
 
 const NAV = [
   { to: '/', label: 'Visão geral', icon: LayoutDashboard, end: true },
   { to: '/mes', label: 'Resumo do mês', icon: CalendarRange },
+  { to: '/compras', label: 'Compras', icon: ShoppingCart },
   { to: '/produtos', label: 'Produtos e estoque', icon: Package },
   { to: '/validades', label: 'Validades', icon: CalendarClock },
+  { to: '/conciliacao', label: 'Conciliação', icon: ClipboardCheck },
   { to: '/fornecedores', label: 'Fornecedores', icon: Truck },
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/setores', label: 'Setores', icon: Shapes, filhos: SUBABAS_SETORES },
+  { to: '/qualidade', label: 'Qualidade do dado', icon: ShieldAlert },
   { to: '/sincronizacao', label: 'Sincronização', icon: RefreshCw },
 ]
 
@@ -80,6 +86,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Resumo />} />
           <Route path="/mes" element={<Mes />} />
+          <Route path="/compras" element={<Compras />} />
+          <Route path="/conciliacao" element={<Conciliacao />} />
+          <Route path="/qualidade" element={<Qualidade />} />
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/validades" element={<Validades />} />
           <Route path="/fornecedores" element={<Fornecedores />} />
