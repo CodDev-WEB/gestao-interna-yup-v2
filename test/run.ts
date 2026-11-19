@@ -14,7 +14,7 @@ import { convertValue, toTimestamp } from '../src/sync/convert'
 import { assertReadOnly, buildSelect, literal } from '../src/sync/sql'
 import { isDue, runSync, emptyState, type ErpLike } from '../src/sync/engine'
 import type { JobState, RunRecord, Settings, Store } from '../src/sync/store'
-import type { TypedRow } from '../src/sync/convert'
+import type { Aviso, TypedRow } from '../src/sync/convert'
 import { mirrorSql } from '../scripts/mirror-sql'
 
 let passed = 0
@@ -212,6 +212,10 @@ class PgStore implements Store {
   async markStale(table: string, before: string, now: string) {
     await sb.query(`update ${table} set sync_deleted_at = $1 where sync_seen_at < $2 and sync_deleted_at is null`, [now, before])
   }
+  async saveWarnings(avisos: Aviso[]) {
+    for (const a of avisos) await sb.query(`insert into sync_avisos (chave, dataset, tabela, coluna, valor, motivo, acao, registro, ultima_vez, resolvido_em) values ($1,$2,$3,$4,$5,$6,$7,$8, now(), null)
+      on conflict (chave) do update set valor = excluded.valor, ultima_vez = now(), resolvido_em = null`, [a.chave, a.dataset ?? null, a.tabela, a.coluna, String(a.valor), a.motivo, a.acao, JSON.stringify(a.registro)])
+  }
   async insertRun(r: RunRecord) {
     await sb.query('insert into sync_runs (dataset, mode, status, started_at, finished_at, rows_read, rows_written, erp_requests, error, details) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
       ['*', r.trigger, r.status, r.started_at, r.finished_at, r.rows_read, r.rows_written, r.erp_requests, r.error, JSON.stringify(r.details)])
@@ -362,27 +366,47 @@ await test('erro de dados num job não para os outros e fica registrado', async 
   assert.equal(await count(sb, 'select count(*) as n from erp_mercadoria_marca where _idmarca = 2'), 1)
 })
 
-await test('registro inválido: guarda item, lote e campo e o diagnóstico diz onde corrigir', async () => {
+await test('data impossível em campo secundário não para a leitura: fica em branco ou o lote é pulado, e vira aviso', async () => {
   await erp.exec(`alter table mercadoria_grupo rename column descricao_x to descricao`)
-  await erp.exec(`insert into mercadoria_estoque_lote (_idempresa, _idlocalestoque, _idmercadoriavariacao, _lote, _dtvalidade, _dtentrada, qtdsaldo, datahora) values (1, 1, 110, 'LX9', '0206-01-30', '${day(-15)}', 7, '${at(0)}')`)
+  // Lote com validade no ano 0206 (a validade é chave do lote) e um lote válido depois dele na ordem da chave.
+  await erp.exec(`insert into mercadoria_estoque_lote (_idempresa, _idlocalestoque, _idmercadoriavariacao, _lote, _dtvalidade, _dtentrada, qtdsaldo, datahora) values
+    (1, 1, 110, 'LX9', '0206-01-30', '${day(-15)}', 7, '${at(0)}'), (1, 1, 120, 'LZ', '${day(90)}', '${day(-15)}', 3, '${at(0)}')`)
+  // Item de nota com validade digitada no ano 0026 (campo secundário).
+  await doc({ id: 2000, ...compra, dia: 0, itens: [[1, 120, 5, 25, 5]] })
+  await erp.exec(`update documento_mercadoria set dtvalidade = '0026-12-01', lote = 'W1' where _iddocumento = 2000`)
   const clock = new Date(t1.getTime() + 50 * 3600 * 1000)
-  await runSync({ erp: new FakeErp(25, 25), store }, { ...opts, trigger: 'manual', only: ['mercadoria_estoque_lote'], now: () => clock })
-  const st = (await store.getStates()).find(x => x.dataset === 'mercadoria_estoque_lote')!
+  for (let i = 0; i < 6; i++) {
+    const r = await runSync({ erp: new FakeErp(25, 25), store }, { ...opts, trigger: 'manual', only: ['mercadoria_estoque_lote', 'documento', 'documento_mercadoria'], now: () => new Date(clock.getTime() + i * 60_000) })
+    assert.notEqual(r.status, 'error')
+  }
+  const states = await store.getStates()
+  for (const ds of ['mercadoria_estoque_lote', 'documento_mercadoria']) assert.notEqual(states.find(x => x.dataset === ds)!.status, 'error', `${ds} não deveria parar`)
+  assert.equal(await count(sb, `select count(*) as n from erp_mercadoria_estoque_lote where _lote = 'LZ' and sync_deleted_at is null`), 1, 'lote depois do inválido deveria entrar')
+  assert.equal(await count(sb, `select count(*) as n from erp_mercadoria_estoque_lote where _lote = 'LX9'`), 0)
+  const item = await one<{ dtvalidade: Date | null; lote: string }>('select dtvalidade, lote from erp_documento_mercadoria where _iddocumento = 2000')
+  assert.equal(item.dtvalidade, null); assert.equal(item.lote, 'W1')
+  const av = (await sb.query<{ tabela: string; coluna: string; acao: string; valor: string; registro: Record<string, unknown> }>('select tabela, coluna, acao, valor, registro from sync_avisos where resolvido_em is null order by tabela')).rows
+  const lote = av.find(a => a.tabela === 'mercadoria_estoque_lote')!, nota = av.find(a => a.tabela === 'documento_mercadoria')!
+  assert.equal(lote.acao, 'ignorado'); assert.equal(Number(lote.registro._idmercadoriavariacao), 110); assert.equal(lote.registro._lote, 'LX9')
+  assert.equal(nota.acao, 'em_branco'); assert.equal(nota.coluna, 'dtvalidade'); assert.equal(Number(nota.registro._iddocumento), 2000)
+  // O diagnóstico do aviso diz que a leitura não parou e onde corrigir.
+  const fakeDb = { select: async (t: string, q: string) => (await sb.query(t === 'vw_produto_desempenho' ? `select descricao, codigobarras, secao, setor, estoque_atual from vw_produto_desempenho where idmercadoriavariacao = ${q.match(/eq\.(\d+)/)![1]}` : 'select 1 where false')).rows }
+  const dg = await diagnosticar({ ...lote, valor: lote.valor, motivo: 'não é data' }, '', fakeDb as never, lote.acao as 'ignorado')
+  assert.equal(dg.valor_recebido, '30/01/0206'); assert.match(dg.problema, /ano 0206/); assert.match(dg.impacto, /não foi copiado/)
+  assert.ok(dg.passos.some(p => p.includes('LX9')))
+})
+
+await test('data impossível em campo essencial (data do documento) ainda para a leitura, com diagnóstico', async () => {
+  await erp.exec(`insert into documento (_iddocumento, idempresa, idpessoa, datahora, numero, modelo, tipomovimento, tipomovimentofinanceiro, status) values (2001, 1, 600, '0026-05-01 10:00', '2001', '65', 'S', 'R', 'E')`)
+  const clock = new Date(t1.getTime() + 60 * 3600 * 1000)
+  await runSync({ erp: new FakeErp(25, 25), store }, { ...opts, trigger: 'manual', only: ['documento'], now: () => clock })
+  const st = (await store.getStates()).find(x => x.dataset === 'documento')!
   assert.equal(st.status, 'error')
   const { mensagem, info } = lerErro(st.last_error)
-  assert.match(mensagem, /_dtvalidade/)
-  assert.ok(info, 'detalhe estruturado deveria estar gravado')
-  assert.equal(info!.coluna, '_dtvalidade')
-  assert.equal(Number(info!.registro._idmercadoriavariacao), 110)
-  assert.equal(info!.registro._lote, 'LX9')
-  const fakeDb = { select: async (t: string, q: string) => (await sb.query(t === 'vw_produto_desempenho' ? `select descricao, codigobarras, secao, setor, estoque_atual from vw_produto_desempenho where idmercadoriavariacao = ${q.match(/eq\.(\d+)/)![1]}` : t === 'erp_local_estoque' ? `select descricao from erp_local_estoque where _idlocal = ${q.match(/_idlocal=eq\.(\d+)/)![1]}` : 'select 1 where false')).rows }
-  const dg = await diagnosticar(info!, mensagem, fakeDb as never)
-  assert.equal(dg.valor_recebido, '30/01/0206')
-  assert.match(dg.problema, /ano 0206/)
-  assert.equal(dg.item?.id, 110)
-  assert.equal(dg.lote?.lote, 'LX9')
-  assert.ok(dg.passos.some(p => p.includes('LX9')) && dg.passos.some(p => p.includes('30/01/0206')))
-  await erp.exec(`delete from mercadoria_estoque_lote where _lote = 'LX9'`)
+  assert.match(mensagem, /datahora/); assert.equal(Number(info!.registro._iddocumento), 2001)
+  const dg = await diagnosticar(info!, mensagem, { select: async () => [] } as never)
+  assert.match(dg.impacto, /parada/); assert.ok(dg.passos.some(p => p.includes('2001')))
+  await erp.exec(`delete from documento where _iddocumento = 2001`)
 })
 
 console.log(`\n${passed} testes passaram.`)

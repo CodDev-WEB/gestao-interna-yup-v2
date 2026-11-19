@@ -95,6 +95,21 @@ function pick(row: Record<string, unknown>, col: string): unknown {
 /** Dados para localizar no ERP o registro que não pôde ser lido (vai para o diagnóstico da tela Sincronização). */
 export type RowErrorInfo = { tabela: string; coluna: string; valor: unknown; motivo: string; registro: Record<string, unknown> }
 
+/**
+ * Aviso: valor impossível que NÃO parou a leitura.
+ *  - 'em_branco': coluna secundária gravada vazia (ex.: validade digitada no item da nota);
+ *  - 'ignorado': o registro inteiro não foi copiado (a data faz parte da chave, ex.: validade do lote).
+ */
+export type Aviso = RowErrorInfo & { chave: string; dataset?: string; acao: 'em_branco' | 'ignorado' }
+
+/** Um registro que deve ser pulado (sem parar a leitura). */
+export class SkipRow extends Error { constructor(public aviso: Aviso) { super(aviso.motivo) } }
+
+// Datas que, se impossíveis, ainda param a leitura: sem elas o documento cairia no período errado.
+const ESSENCIAIS = new Set(['documento.datahora'])
+// Tabelas em que um registro com data impossível na chave pode ser pulado sem distorcer o resto.
+const PULAVEIS = new Set(['mercadoria_estoque_lote'])
+
 /** Valor de um registro que não converte: guarda tabela, coluna, valor e as colunas que identificam o registro. */
 export class RowError extends Error {
   constructor(message: string, public info: RowErrorInfo) { super(message) }
@@ -106,7 +121,7 @@ const IDENT = ['_idempresa', 'idempresa', '_idlocalestoque', 'idlocalestoque', '
   '_idinventario', '_idtabela', '_idhistorico', 'descricao', 'nome', 'codigobarras', 'qtdsaldo']
 
 /** Converte um registro do ERP. Coluna ausente ou valor inválido = erro com o motivo. */
-export function convertRow(d: Dataset, row: Record<string, unknown>, utcOffset: string): TypedRow {
+export function convertRow(d: Dataset, row: Record<string, unknown>, utcOffset: string, avisos?: Aviso[]): TypedRow {
   const out: TypedRow = {}
   for (const col of d.columns) {
     const raw = pick(row, col)
@@ -116,7 +131,15 @@ export function convertRow(d: Dataset, row: Record<string, unknown>, utcOffset: 
       const motivo = e instanceof Error ? e.message : String(e)
       const registro: Record<string, unknown> = {}
       for (const c of IDENT) if (d.columns.includes(c)) { const v = pick(row, c); if (v !== undefined && v !== null && v !== '') registro[c] = typeof v === 'string' ? v.slice(0, 120) : v }
-      throw new RowError(`${d.table}.${col} = ${JSON.stringify(raw)}: ${motivo}`, { tabela: d.table, coluna: col, valor: raw, motivo, registro })
+      const info = { tabela: d.table, coluna: col, valor: raw, motivo, registro }
+      const tipo = columnType(col)
+      const ehData = tipo === 'date' || tipo === 'ts'
+      if (avisos && ehData && !ESSENCIAIS.has(`${d.table}.${col}`)) {
+        const chave = `${d.table}|${col}|${JSON.stringify(d.keys.map(k => pick(row, k) ?? null))}`.slice(0, 500)
+        if (!d.keys.includes(col)) { avisos.push({ ...info, chave, acao: 'em_branco' }); out[col] = null; continue }
+        if (PULAVEIS.has(d.table)) throw new SkipRow({ ...info, chave, acao: 'ignorado' })
+      }
+      throw new RowError(`${d.table}.${col} = ${JSON.stringify(raw)}: ${motivo}`, info)
     }
     if (d.keys.includes(col) && out[col] === null) throw new Error(`${d.table}: chave "${col}" nula`)
   }

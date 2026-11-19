@@ -5,7 +5,8 @@
 // 3 subrequests (ERP + gravação + estado) e o estado é salvo a cada página, então uma execução
 // interrompida continua de onde parou na próxima.
 
-import { convertRow, keyOf, RowError, type TypedRow, type Value } from './convert'
+import { convertRow, convertValue, keyOf, RowError, SkipRow, type Aviso, type TypedRow, type Value } from './convert'
+import { columnType } from './datasets'
 import { DATASETS, target, type Dataset } from './datasets'
 import { buildSelect } from './sql'
 import type { JobState, Store } from './store'
@@ -28,7 +29,7 @@ export interface SyncOptions {
   now?: () => Date
 }
 
-export interface JobSummary { dataset: string; pages: number; rows: number; status: string; completed: boolean; error?: string }
+export interface JobSummary { dataset: string; pages: number; rows: number; status: string; completed: boolean; error?: string; avisos?: number; avisos_nao_gravados?: Aviso[] }
 
 export interface SyncResult {
   status: 'ok' | 'partial' | 'error' | 'skipped'
@@ -113,8 +114,21 @@ async function runJob(d: Dataset, s: JobState, deps: { erp: ErpLike; store: Stor
     const seenAt = now().toISOString()
     const byKey = new Map<string, TypedRow>()
     let last: Value[] | null = null
+    const avisos: Aviso[] = []
     for (const raw of rows) {
-      const row = convertRow(d, raw, opts.utcOffset)
+      let row: TypedRow
+      try { row = convertRow(d, raw, opts.utcOffset, avisos) }
+      catch (e) {
+        if (!(e instanceof SkipRow)) throw e
+        // Registro pulado: avança o cursor pelas chaves cruas (já ordenadas pelo ERP) sem gravar o registro.
+        avisos.push(e.aviso)
+        last = d.keys.map(k => {
+          const v = raw[k] ?? raw[k.toUpperCase()]
+          try { return convertValue(columnType(k), v, opts.utcOffset) }
+          catch { const s = String(v).slice(0, 10); if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; throw e }
+        })
+        continue
+      }
       const key = keyOf(d, row)
       byKey.set(JSON.stringify(key), { ...row, sync_seen_at: seenAt, sync_deleted_at: null })
       last = key
@@ -122,6 +136,13 @@ async function runJob(d: Dataset, s: JobState, deps: { erp: ErpLike; store: Stor
     if (sameKey(s.cursor, last!)) throw new Error(`${d.name}: a API repetiu a mesma página (cursor não avançou).`)
 
     budget.take(); await deps.store.upsert(target(d), [...byKey.values()], d.keys)
+    if (avisos.length) {
+      for (const a of avisos) a.dataset = d.name
+      summary.avisos = (summary.avisos ?? 0) + avisos.length
+      // Sem a tabela de avisos (migração pendente), guarda no registro da execução e segue.
+      try { budget.take(); await deps.store.saveWarnings(avisos) }
+      catch { summary.avisos_nao_gravados = [...(summary.avisos_nao_gravados ?? []), ...avisos].slice(0, 20) }
+    }
     s.cursor = last
     s.rows_cycle += byKey.size
     s.rows_total += byKey.size

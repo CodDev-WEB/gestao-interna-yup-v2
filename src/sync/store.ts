@@ -2,7 +2,7 @@
 // nos testes, um Postgres local (PGlite) implementa a mesma interface.
 
 import type { Supabase } from '../supabase/client'
-import type { TypedRow, Value } from './convert'
+import type { Aviso, TypedRow, Value } from './convert'
 
 export interface JobState {
   dataset: string
@@ -37,6 +37,8 @@ export interface Store {
   /** Marca como removido do ERP o que não foi visto desde `before` (nada é apagado). */
   markStale(table: string, before: string, now: string): Promise<void>
   insertRun(run: RunRecord): Promise<void>
+  /** Registra valores impossíveis que não pararam a leitura (um por registro+coluna). */
+  saveWarnings(avisos: Aviso[]): Promise<void>
 }
 
 export const LOCK_NAME = 'erp_sync'
@@ -73,6 +75,16 @@ export class PostgrestStore implements Store {
 
   async markStale(table: string, before: string, now: string) {
     await this.db.patch(table, `sync_seen_at=lt.${encodeURIComponent(before)}&sync_deleted_at=is.null`, { sync_deleted_at: now })
+  }
+
+  async saveWarnings(avisos: Aviso[]) {
+    if (!avisos.length) return
+    const agora = new Date().toISOString()
+    const unicos = [...new Map(avisos.map(a => [a.chave, a])).values()]
+    await this.db.upsert('sync_avisos', unicos.map(a => ({
+      chave: a.chave, dataset: a.dataset ?? null, tabela: a.tabela, coluna: a.coluna, valor: String(a.valor ?? '').slice(0, 200), motivo: a.motivo,
+      acao: a.acao, registro: a.registro, ultima_vez: agora, resolvido_em: null,
+    })), 'chave')
   }
 
   async insertRun(run: RunRecord) {

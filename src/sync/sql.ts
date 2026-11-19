@@ -14,7 +14,9 @@ export function literal(type: ColType, value: Value): string {
       if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`Número inválido: ${value}`)
       return String(value)
     case 'date':
-      if (!isIsoDate(value)) throw new Error(`Data inválida: ${value}`)
+      // Aceita também anos fora de 1900–2200 (ex.: 0206), que existem no ERP e podem ser marcador de continuação
+      // de um registro pulado. O formato rígido (só dígitos) mantém o SQL seguro.
+      if (!isIsoDate(value) && !(typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value))) throw new Error(`Data inválida: ${value}`)
       return `'${value}'`
     case 'ts':
       if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(value)) throw new Error(`Data/hora inválida: ${value}`)

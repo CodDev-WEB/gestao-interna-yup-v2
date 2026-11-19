@@ -411,3 +411,14 @@ td.money { font-weight: 700; color: var(--ink); }
   .fix-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .kv dd.status-bad { color: var(--critical); }
+.fix.aviso { border-color: #f3dfb8; border-left-color: var(--yellow); padding: 0; }
+.fix.aviso > summary { list-style: none; cursor: pointer; display: flex; gap: 12px; align-items: center; padding: 14px 18px; }
+.fix.aviso > summary::-webkit-details-marker { display: none; }
+.fix.aviso > summary::after { content: '›'; margin-left: auto; font-size: 20px; color: var(--muted); transition: transform 0.15s; }
+.fix.aviso[open] > summary::after { transform: rotate(90deg); }
+.fix.aviso[open] { padding-bottom: 16px; }
+.fix.aviso > :not(summary) { margin-left: 18px; margin-right: 18px; }
+.aviso-tit { display: grid; gap: 2px; min-width: 0; }
+.aviso-tit small { color: var(--muted); }
+.aviso-tit small b { font-weight: 700; }
+.kv dd small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; }

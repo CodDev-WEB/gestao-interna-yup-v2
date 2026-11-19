@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api, useApi } from '../api'
 import { haQuanto, int } from '../format'
-import { AlertTriangle, Database, Loader, MapPin, Power, RefreshCw, RotateCw, Wrench } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Database, Info, Loader, MapPin, Power, RefreshCw, RotateCw, Wrench } from 'lucide-react'
 import { ItemLink } from '../ProdutoPainel'
 import { ErrorState, Loading, Metric, PageHead } from '../ui'
 
@@ -14,7 +14,8 @@ type Diagnostico = {
 }
 type Job = { dataset: string; kind: string; refresh_minutes: number; description: string; diagnostico: Diagnostico | null; state: { status: string; rows_total: number | string; rows_cycle: number | string; last_synced_at: string | null; last_completed_at: string | null; last_error: string | null; enabled: boolean; cycle_started_at: string | null } | null }
 type Run = { id: number; mode: string; status: string; started_at: string; finished_at: string | null; rows_written: number; erp_requests: number; error: string | null }
-type Status = { settings: { auto_enabled: boolean; recent_days: number; updated_at: string } | null; jobs: Job[]; runs: Run[] }
+type AvisoDiag = Diagnostico & { chave: string; acao: 'em_branco' | 'ignorado'; dataset: string | null; primeira_vez: string | null; ultima_vez: string | null }
+type Status = { avisos?: AvisoDiag[]; total_avisos?: number; tabela_avisos?: boolean; settings: { auto_enabled: boolean; recent_days: number; updated_at: string } | null; jobs: Job[]; runs: Run[] }
 
 const intervalo = (m: number) => m < 60 ? `a cada ${m} min` : m < 1440 ? `a cada ${m / 60} h` : 'diário'
 const statusTxt = (j: Job) => {
@@ -34,6 +35,29 @@ function erroAmigavel(msg: string) {
   if (/429|limite|rate/i.test(msg)) return 'O ERP pediu uma pausa (limite de consultas). A leitura continua sozinha na próxima rodada.'
   if (/401|403|token|autentica/i.test(msg)) return 'O ERP recusou o acesso. Confira o token do ERP no Cloudflare.'
   return msg
+}
+
+/** Dados do registro (item, lote, documento) com o valor errado em destaque. */
+function DadosRegistro({ d }: { d: Diagnostico }) {
+  return (
+    <dl className="kv fix-kv">
+      <div><dt>Campo com erro</dt><dd>{d.campo}</dd></div>
+      <div><dt>Valor no ERP</dt><dd className="status-bad">{d.valor_recebido}</dd></div>
+      {d.item && <>
+        <div><dt>Item</dt><dd><ItemLink id={d.item.id}>{d.item.nome ?? `Produto ${d.item.id}`}</ItemLink></dd></div>
+        <div><dt>Código interno</dt><dd>{d.item.id}</dd></div>
+        <div><dt>Código de barras</dt><dd>{d.item.codigobarras ?? '—'}</dd></div>
+        <div><dt>Seção / setor</dt><dd>{d.item.secao ?? '—'} · {d.item.setor ?? '—'}</dd></div>
+      </>}
+      {d.lote && <>
+        <div><dt>Lote</dt><dd>{d.lote.lote}</dd></div>
+        {d.lote.entrada && <div><dt>Entrada do lote</dt><dd>{d.lote.entrada}</dd></div>}
+        {d.lote.local && <div><dt>Local / saldo</dt><dd>{d.lote.local}{d.lote.saldo !== null ? ` · ${int(d.lote.saldo)} un.` : ''}</dd></div>}
+      </>}
+      {d.documento && <div><dt>Documento</dt><dd>{[d.documento.modelo && `modelo ${d.documento.modelo}`, d.documento.numero && `nº ${d.documento.numero}`].filter(Boolean).join(' ')}{d.documento.data ? ` · ${d.documento.data}` : ''}<small>código interno {d.documento.id}</small></dd></div>}
+      {d.pessoa && <div><dt>Pessoa</dt><dd>{d.pessoa.nome ?? `código ${d.pessoa.id}`}</dd></div>}
+    </dl>
+  )
 }
 
 export default function Sincronizacao() {
@@ -89,23 +113,7 @@ export default function Sincronizacao() {
                       <RotateCw size={15} aria-hidden />{ocupado === j.dataset ? 'Lendo…' : 'Ler de novo'}
                     </button>
                   </header>
-                  <dl className="kv fix-kv">
-                    <div><dt>Campo com erro</dt><dd>{d.campo}</dd></div>
-                    <div><dt>Valor no ERP</dt><dd className="status-bad">{d.valor_recebido}</dd></div>
-                    {d.item && <>
-                      <div><dt>Item</dt><dd><ItemLink id={d.item.id}>{d.item.nome ?? `Produto ${d.item.id}`}</ItemLink></dd></div>
-                      <div><dt>Código interno</dt><dd>{d.item.id}</dd></div>
-                      <div><dt>Código de barras</dt><dd>{d.item.codigobarras ?? '—'}</dd></div>
-                      <div><dt>Seção / setor</dt><dd>{d.item.secao ?? '—'} · {d.item.setor ?? '—'}</dd></div>
-                    </>}
-                    {d.lote && <>
-                      <div><dt>Lote</dt><dd>{d.lote.lote}</dd></div>
-                      <div><dt>Entrada do lote</dt><dd>{d.lote.entrada ?? '—'}</dd></div>
-                      <div><dt>Local / saldo</dt><dd>{d.lote.local ?? '—'}{d.lote.saldo !== null ? ` · ${int(d.lote.saldo)} un.` : ''}</dd></div>
-                    </>}
-                    {d.documento && <div><dt>Documento</dt><dd>{[d.documento.modelo, d.documento.numero && `nº ${d.documento.numero}`].filter(Boolean).join(' ') || `código ${d.documento.id}`}{d.documento.data ? ` · ${d.documento.data}` : ''}</dd></div>}
-                    {d.pessoa && <div><dt>Pessoa</dt><dd>{d.pessoa.nome ?? `código ${d.pessoa.id}`}</dd></div>}
-                  </dl>
+                  <DadosRegistro d={d} />
                   <div className="fix-onde"><MapPin size={16} aria-hidden /><div><strong>Onde ajustar:</strong> {d.onde_corrigir}</div></div>
                   <ol className="fix-passos">{d.passos.map((p, i) => <li key={i}>{p}</li>)}</ol>
                   <p className="hint" style={{ margin: '10px 0 0' }}>{d.impacto}</p>
@@ -114,6 +122,35 @@ export default function Sincronizacao() {
               )
             })}
           </div>
+        </section>
+      )}
+      {st.tabela_avisos === false && (st.avisos?.length ?? 0) > 0 && (
+        <div className="notice"><Info size={18} aria-hidden /><div>Os avisos abaixo vêm só das últimas execuções. Para guardar todos e poder marcá-los como resolvidos, instale no Supabase a migração <code>20261119000000_sync_avisos.sql</code> (SQL Editor).</div></div>
+      )}
+      {(st.avisos?.length ?? 0) > 0 && (
+        <section className="section" style={{ marginTop: 0, marginBottom: 24 }} aria-labelledby="avisos-h">
+          <div className="section-head">
+            <div><span className="eyebrow">A leitura continuou</span><h2 id="avisos-h">Avisos de dados para corrigir no ERP</h2>
+              <p className="hint" style={{ margin: '4px 0 0' }}>{int(st.total_avisos ?? st.avisos!.length)} {st.total_avisos === 1 ? 'registro veio' : 'registros vieram'} com data impossível em campo secundário. A sincronização não parou: o campo ficou em branco, ou o registro não foi copiado quando a data faz parte da identificação dele.</p></div>
+            {st.tabela_avisos !== false && <button className="btn secondary" disabled={!!ocupado} onClick={() => { if (window.confirm('Marcar todos os avisos como resolvidos?')) acao('todos', () => api('sync/avisos/resolver', { method: 'POST', body: JSON.stringify({ todos: true }) })) }}><CheckCircle2 size={15} aria-hidden />Marcar todos como resolvidos</button>}
+          </div>
+          <div className="fix-list">
+            {st.avisos!.map(a => (
+              <details key={a.chave} className="fix aviso">
+                <summary>
+                  <span className={`pill ${a.acao === 'ignorado' ? 'bad' : 'warn'}`}>{a.acao === 'ignorado' ? 'Não copiado' : 'Gravado em branco'}</span>
+                  <span className="aviso-tit"><strong>{a.titulo}</strong><small>{a.campo}: <b className="status-bad">{a.valor_recebido}</b>{a.documento ? ` · documento ${a.documento.numero ? `nº ${a.documento.numero}` : `código ${a.documento.id}`}${a.documento.data ? ` de ${a.documento.data}` : ''}` : ''}{a.lote ? ` · lote ${a.lote.lote}` : ''}</small></span>
+                </summary>
+                <p className="fix-problema" style={{ margin: '12px 0' }}>{a.problema}</p>
+                <DadosRegistro d={a} />
+                <div className="fix-onde"><MapPin size={16} aria-hidden /><div><strong>Onde ajustar:</strong> {a.onde_corrigir}</div></div>
+                <ol className="fix-passos">{a.passos.map((p, i) => <li key={i}>{p}</li>)}</ol>
+                <p className="hint" style={{ margin: '10px 0 0' }}>{a.impacto}</p>
+                {st.tabela_avisos !== false && <button className="btn secondary" style={{ marginTop: 12 }} disabled={!!ocupado} onClick={() => acao(a.chave, () => api('sync/avisos/resolver', { method: 'POST', body: JSON.stringify({ chave: a.chave }) }))}><CheckCircle2 size={15} aria-hidden />{ocupado === a.chave ? 'Salvando…' : 'Marcar como resolvido'}</button>}
+              </details>
+            ))}
+          </div>
+          {(st.total_avisos ?? 0) > st.avisos!.length && <p className="hint" style={{ marginTop: 10 }}>Mostrando os {st.avisos!.length} mais recentes de {int(st.total_avisos)}.</p>}
         </section>
       )}
       <div className="table-wrap cards-sm">

@@ -76,51 +76,89 @@ function explicar(info: RowErrorInfo): string {
   return `Valor fora do padrão (${info.motivo}).`
 }
 
-export async function diagnosticar(info: RowErrorInfo & { lidos_no_ciclo?: number }, mensagem: string, db: Supabase): Promise<Diagnostico> {
+type Ctx = { prod: Map<number, Row>; doc: Map<number, Row>; pessoa: Map<number, Row>; local: Map<string, Row> }
+export type Acao = 'em_branco' | 'ignorado' | undefined
+
+const ids = (infos: RowErrorInfo[], ...cols: string[]) =>
+  [...new Set(infos.map(i => { for (const c of cols) { const v = num(i.registro?.[c]); if (v !== null && Number.isSafeInteger(v)) return v } return null }).filter((v): v is number => v !== null))]
+
+/** Busca de uma vez (uma consulta por tabela) os nomes de itens, documentos, pessoas e locais citados. */
+async function contexto(infos: RowErrorInfo[], db: Supabase): Promise<Ctx> {
+  const it = ids(infos, '_idmercadoriavariacao', 'idmercadoriavariacao'), dc = ids(infos, '_iddocumento'), ps = ids(infos, '_idpessoa', 'idpessoa'), lc = ids(infos, '_idlocalestoque', 'idlocalestoque')
+  const [prod, doc, pessoa, local] = await Promise.all([
+    it.length ? db.select<Row>('vw_produto_desempenho', `idmercadoriavariacao=in.(${it.join(',')})&select=idmercadoriavariacao,descricao,codigobarras,secao,setor,estoque_atual`).catch(() => []) : [],
+    dc.length ? db.select<Row>('erp_documento', `_iddocumento=in.(${dc.join(',')})&select=_iddocumento,numero,serie,modelo,datahora,idpessoa`).catch(() => []) : [],
+    ps.length ? db.select<Row>('erp_pessoa', `_idpessoa=in.(${ps.join(',')})&select=_idpessoa,nome,sobrenome`).catch(() => []) : [],
+    lc.length ? db.select<Row>('erp_local_estoque', `_idlocal=in.(${lc.join(',')})&select=_idempresa,_idlocal,descricao`).catch(() => []) : [],
+  ])
+  return {
+    prod: new Map(prod.map(r => [Number(r.idmercadoriavariacao), r])), doc: new Map(doc.map(r => [Number(r._iddocumento), r])),
+    pessoa: new Map(pessoa.map(r => [Number(r._idpessoa), r])), local: new Map(local.map(r => [`${r._idempresa}-${r._idlocal}`, r])),
+  }
+}
+
+export async function diagnosticar(info: RowErrorInfo & { lidos_no_ciclo?: number }, mensagem: string, db: Supabase, acao?: Acao): Promise<Diagnostico> {
+  return montar(info, mensagem, await contexto([info], db), acao)
+}
+
+/** Vários avisos com as consultas agrupadas (cabe no limite de subrequests do Worker). */
+export async function diagnosticarVarios(lista: { info: RowErrorInfo; acao: Acao; chave: string }[], db: Supabase) {
+  const ctx = await contexto(lista.map(l => l.info), db)
+  return lista.map(l => ({ chave: l.chave, acao: l.acao, ...montar(l.info, '', ctx, l.acao) }))
+}
+
+function montar(info: RowErrorInfo & { lidos_no_ciclo?: number }, mensagem: string, ctx: Ctx, acao: Acao): Diagnostico {
   const r = info.registro ?? {}
   const idItem = num(r._idmercadoriavariacao ?? r.idmercadoriavariacao)
   const idDoc = num(r._iddocumento)
   const idPessoa = num(r._idpessoa ?? r.idpessoa)
-  const idLocal = num(r._idlocalestoque ?? r.idlocalestoque), idEmpresa = num(r._idempresa ?? r.idempresa)
-
-  const [prod, doc, pessoa, local] = await Promise.all([
-    idItem !== null && Number.isSafeInteger(idItem) ? db.select<Row>('vw_produto_desempenho', `idmercadoriavariacao=eq.${idItem}&select=descricao,codigobarras,secao,setor,estoque_atual`).catch(() => []) : [],
-    idDoc !== null && Number.isSafeInteger(idDoc) ? db.select<Row>('erp_documento', `_iddocumento=eq.${idDoc}&select=numero,serie,modelo,datahora,idpessoa`).catch(() => []) : [],
-    idPessoa !== null && Number.isSafeInteger(idPessoa) ? db.select<Row>('erp_pessoa', `_idpessoa=eq.${idPessoa}&select=nome,sobrenome`).catch(() => []) : [],
-    idLocal !== null && Number.isSafeInteger(idLocal) ? db.select<Row>('erp_local_estoque', `_idlocal=eq.${idLocal}${idEmpresa !== null && Number.isSafeInteger(idEmpresa) ? `&_idempresa=eq.${idEmpresa}` : ''}&select=descricao`).catch(() => []) : [],
-  ])
+  const idLocal = num(r._idlocalestoque ?? r.idlocalestoque), idEmpresa = num(r._idempresa ?? r.idempresa) ?? 1
 
   const chave = `${info.tabela}.${info.coluna}`
   const campo = CAMPOS[chave] ?? { nome: `campo "${info.coluna.replace(/^_/, '')}"`, tela: `Cadastro correspondente a "${TABELAS[info.tabela] ?? info.tabela}" no ERP.` }
   const recebido = valorLegivel(String(info.valor ?? ''))
-  const p = prod[0]
+  const p = idItem !== null ? ctx.prod.get(idItem) : undefined
   const item = idItem !== null ? { id: idItem, nome: (p?.descricao as string) ?? (r.descricao as string) ?? null, codigobarras: (p?.codigobarras as string) ?? (r.codigobarras as string) ?? null, secao: (p?.secao as string) ?? null, setor: (p?.setor as string) ?? null, estoque: num(p?.estoque_atual) } : undefined
+  const loc = idLocal !== null ? ctx.local.get(`${idEmpresa}-${idLocal}`) ?? ctx.local.get(`1-${idLocal}`) : undefined
+  const ehLote = info.tabela === 'mercadoria_estoque_lote'
   const lote = r._lote !== undefined || r.lote !== undefined ? {
     lote: String(r._lote ?? r.lote), entrada: r._dtentrada ? dataBr(String(r._dtentrada)) : null,
     validade: r._dtvalidade ?? r.dtvalidade ? valorLegivel(String(r._dtvalidade ?? r.dtvalidade)) : null,
-    local: (local[0]?.descricao as string) ?? (idLocal !== null ? `Local ${idLocal}` : null), saldo: num(r.qtdsaldo),
+    local: ehLote ? (loc?.descricao as string) ?? (idLocal !== null ? `Local ${idLocal}` : null) : null, saldo: ehLote ? num(r.qtdsaldo) : null,
   } : undefined
-  const d = doc[0]
-  const documento = idDoc !== null ? { id: idDoc, numero: (d?.numero as string) ?? (r.numero as string) ?? null, modelo: (d?.modelo as string) ?? (r.modelo as string) ?? null, data: d?.datahora ? dataBr(String(d.datahora)) : r.datahora && /^\d{4}-\d{2}-\d{2}/.test(String(r.datahora)) ? dataBr(String(r.datahora)) : null, pessoa: null as string | null } : undefined
-  const pes = pessoa[0] ? { id: idPessoa!, nome: [pessoa[0].nome, pessoa[0].sobrenome].map(x => String(x ?? '').trim()).filter(Boolean).join(' ') || null } : idPessoa !== null ? { id: idPessoa, nome: (r.nome as string) ?? null } : undefined
+  const d = idDoc !== null ? ctx.doc.get(idDoc) : undefined
+  const documento = idDoc !== null ? { id: idDoc, numero: (d?.numero as string) ?? (r.numero as string) ?? null, modelo: (d?.modelo as string) ?? (r.modelo as string) ?? null, data: d?.datahora ? dataBr(String(d.datahora)) : r.datahora && /^\d{4}-\d{2}-\d{2}/.test(String(r.datahora)) ? valorLegivel(String(r.datahora)) : null, pessoa: null as string | null } : undefined
+  const pr = idPessoa !== null ? ctx.pessoa.get(idPessoa) : undefined
+  const pes = pr ? { id: idPessoa!, nome: [pr.nome, pr.sobrenome].map(x => String(x ?? '').trim()).filter(Boolean).join(' ') || null } : idPessoa !== null ? { id: idPessoa, nome: (r.nome as string) ?? null } : undefined
 
   // Passo a passo, do jeito que a pessoa faz no ERP.
   const passos: string[] = []
-  if (item) passos.push(`No ERP, abra o produto "${item.nome ?? `código ${item.id}`}" (código interno ${item.id}${item.codigobarras ? `, código de barras ${item.codigobarras}` : ''}).`)
-  if (lote) passos.push(`Localize o lote "${lote.lote}"${lote.entrada ? `, com entrada em ${lote.entrada}` : ''}${lote.local ? `, no ${lote.local.toLowerCase()}` : ''}${lote.saldo !== null ? ` (saldo ${lote.saldo})` : ''}.`)
-  if (documento && !item) passos.push(`No ERP, localize o documento ${documento.modelo ?? ''} nº ${documento.numero ?? documento.id}${documento.data ? ` de ${documento.data}` : ''} (código interno ${documento.id}).`)
-  if (documento && item) passos.push(`O item está no documento ${documento.modelo ?? ''} nº ${documento.numero ?? documento.id}${documento.data ? ` de ${documento.data}` : ''}: abra esse documento.`)
+  const nomeItem = item ? `"${item.nome ?? `código ${item.id}`}" (código interno ${item.id}${item.codigobarras ? `, código de barras ${item.codigobarras}` : ''})` : ''
+  const nomeDoc = documento ? `${documento.modelo ? `modelo ${documento.modelo} ` : ''}${documento.numero ? `nº ${documento.numero} ` : ''}${documento.data ? `de ${documento.data} ` : ''}(código interno ${documento.id})` : ''
+  if (documento) {
+    passos.push(`No ERP, abra o documento ${nomeDoc}.`)
+    if (item) passos.push(`Localize nele o item ${nomeItem}${lote ? `, lote "${lote.lote}"` : ''}.`)
+  } else if (item) {
+    passos.push(`No ERP, abra o produto ${nomeItem}.`)
+    if (lote) passos.push(`Localize o lote "${lote.lote}"${lote.entrada ? `, com entrada em ${lote.entrada}` : ''}${lote.local ? `, no ${lote.local.toLowerCase()}` : ''}${lote.saldo !== null ? ` (saldo ${lote.saldo})` : ''}.`)
+  }
   if (pes && !item && !documento) passos.push(`No ERP, abra o cadastro de "${pes.nome ?? `pessoa ${pes.id}`}" (código ${pes.id}).`)
   passos.push(/data|validade/i.test(campo.nome)
     ? `Corrija a ${campo.nome}: hoje está "${recebido}". Confira a data certa na embalagem ou na nota de entrada.`
     : `Corrija o ${campo.nome}: hoje está "${recebido}".`)
-  passos.push('Salve. A leitura tenta de novo sozinha na próxima rodada; para não esperar, use "Ler de novo" nesta tela.')
+  passos.push(acao === 'em_branco' ? 'Salve no ERP e clique em "Marcar como resolvido" aqui.'
+    : acao === 'ignorado' ? 'Salve. O registro entra na próxima leitura completa desta tabela; depois disso, clique em "Marcar como resolvido".'
+    : 'Salve. A leitura tenta de novo sozinha na próxima rodada; para não esperar, use "Ler de novo" nesta tela.')
 
   const tabela = TABELAS[info.tabela] ?? info.tabela
+  const impacto = acao === 'em_branco'
+    ? `A leitura não parou: aqui no sistema a ${campo.nome} ficou em branco e o resto do registro foi copiado normalmente. Corrigir no ERP mantém o cadastro certo (documentos antigos não são relidos, então o valor corrigido só aparece aqui se o documento for dos últimos dias).`
+    : acao === 'ignorado'
+      ? `A leitura não parou, mas este registro não foi copiado: a ${campo.nome} faz parte da identificação dele. Os demais registros de "${tabela}" foram lidos normalmente.`
+      : `A leitura de "${tabela}" está parada neste registro${info.lidos_no_ciclo ? ` (${info.lidos_no_ciclo.toLocaleString('pt-BR')} registros já lidos nesta volta)` : ''}. Os registros seguintes só entram depois da correção; as outras tabelas continuam normais.`
   return {
     titulo: item ? `${item.nome ?? `Produto ${item.id}`}: ${campo.nome} inválida` : `${tabela}: ${campo.nome} inválido(a)`,
-    campo: campo.nome, valor_recebido: recebido, problema: explicar(info), onde_corrigir: campo.tela, passos,
-    impacto: `A leitura de "${tabela}" está parada neste registro${info.lidos_no_ciclo ? ` (${info.lidos_no_ciclo.toLocaleString('pt-BR')} registros já lidos nesta volta)` : ''}. Os registros seguintes só entram depois da correção; as outras tabelas continuam normais.`,
-    item, lote, documento, pessoa: pes, tecnico: mensagem,
+    campo: campo.nome, valor_recebido: recebido, problema: explicar(info), onde_corrigir: campo.tela, passos, impacto,
+    item, lote, documento, pessoa: pes, tecnico: mensagem || `${info.tabela}.${info.coluna} = ${JSON.stringify(info.valor)}: ${info.motivo}`,
   }
 }

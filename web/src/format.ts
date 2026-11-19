@@ -35,7 +35,8 @@ export const haQuanto = (iso: string | null | undefined) => {
   if (min < 60) return `há ${min} min`
   const h = Math.round(min / 60)
   if (h < 24) return `há ${h} h`
-  return `há ${Math.round(h / 24)} dias`
+  const d = Math.round(h / 24)
+  return d === 1 ? 'há 1 dia' : `há ${d} dias`
 }
 
 /** Variação percentual entre dois valores (null se não dá para comparar). */

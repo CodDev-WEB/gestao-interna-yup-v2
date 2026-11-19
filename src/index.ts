@@ -11,7 +11,7 @@ import { buildCount, buildSelect } from './sync/sql'
 import { runSync, type SyncOptions } from './sync/engine'
 import { PostgrestStore } from './sync/store'
 import { dash, DashError, salvarSecao } from './dash'
-import { diagnosticar, lerErro } from './sync/diagnostico'
+import { diagnosticar, diagnosticarVarios, lerErro } from './sync/diagnostico'
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data, null, 2), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
@@ -247,12 +247,38 @@ export default {
             const diagnostico = info ? await diagnosticar(info, mensagem, db).catch(() => null) : null
             return { dataset: d.name, kind: d.kind, refresh_minutes: d.refreshMinutes, description: d.description, state: st ? { ...st, last_error: st.last_error ? mensagem : null } : null, diagnostico }
           }))
+          // Avisos: valores impossíveis que não pararam a leitura (tabela sync_avisos; sem ela, os das últimas execuções).
+          type AvisoRow = { chave: string; tabela: string; coluna: string; valor: string; motivo: string; acao: 'em_branco' | 'ignorado'; registro: Record<string, unknown>; dataset: string | null; primeira_vez?: string; ultima_vez?: string }
+          let abertos: AvisoRow[] = [], totalAvisos = 0, tabelaAvisos = true
+          try {
+            const pg = await db.selectPage<AvisoRow>('sync_avisos', 'resolvido_em=is.null&select=*&order=ultima_vez.desc', 30, 0)
+            abertos = pg.rows; totalAvisos = pg.total
+          } catch {
+            tabelaAvisos = false
+            const det = await db.select<{ details: { jobs?: { avisos_nao_gravados?: AvisoRow[] }[] } | null }>('sync_runs', 'select=details&order=started_at.desc&limit=30').catch(() => [])
+            abertos = [...new Map(det.flatMap(r => (r.details?.jobs ?? []).flatMap(j => j.avisos_nao_gravados ?? [])).map(a => [a.chave, a])).values()].slice(0, 30)
+            totalAvisos = abertos.length
+          }
+          const avisos = abertos.length ? (await diagnosticarVarios(abertos.map(a => ({ chave: a.chave, acao: a.acao, info: a })), db).catch(() => []))
+            .map((dg, i) => ({ ...dg, dataset: abertos[i].dataset, primeira_vez: abertos[i].primeira_vez ?? null, ultima_vez: abertos[i].ultima_vez ?? null })) : []
           return json({
             ok: true,
             settings: settings[0] ?? null,
+            avisos, total_avisos: totalAvisos, tabela_avisos: tabelaAvisos,
             jobs,
             runs,
           })
+        }
+
+        // Marca avisos de leitura como resolvidos (corrigidos no ERP ou aceitos). Corpo {"chave": "..."} ou {"todos": true}.
+        case 'POST /api/sync/avisos/resolver': {
+          const b = await body(req)
+          const db = new Supabase(env)
+          const agora = new Date().toISOString()
+          if (b.todos === true) await db.patch('sync_avisos', 'resolvido_em=is.null', { resolvido_em: agora })
+          else if (typeof b.chave === 'string' && b.chave.length <= 500) await db.patch('sync_avisos', `chave=eq.${encodeURIComponent(b.chave)}`, { resolvido_em: agora })
+          else throw new BadRequest('Informe {"chave": "..."} ou {"todos": true}.')
+          return json({ ok: true, message: b.todos ? 'Todos os avisos foram marcados como resolvidos.' : 'Aviso marcado como resolvido.' })
         }
 
         // Executa agora (respeita a trava e o orçamento). Corpo opcional {"datasets": [...]} força esses jobs.
