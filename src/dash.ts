@@ -82,7 +82,7 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
         db.count('vw_fornecedor_preco_item', 'variacao_ultima_pct=gte.10'),
         db.count('vw_cliente_rfm', 'segmento=eq.em_risco'),
         db.count('vw_produto_declinio', 'queda_consecutiva=is.true&estoque_atual=gt.0'),
-        db.select<{ dataset: string; status: string; last_synced_at: string | null; last_completed_at: string | null }>('sync_state', 'select=dataset,status,last_synced_at,last_completed_at'),
+        db.select<{ dataset: string; status: string; last_synced_at: string | null; last_completed_at: string | null; cursor: unknown[] | null }>('sync_state', 'select=dataset,status,last_synced_at,last_completed_at,cursor'),
       ])
       // Soma por dia (a view separa por empresa).
       const porDia = new Map<string, { data: string; faturamento: number; lucro: number; vendas: number; devolucoes: number; sem_custo: number }>()
@@ -100,11 +100,27 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       const serie: { data: string; faturamento: number; lucro: number; vendas: number }[] = []
       for (let d = inicio; d <= fim; d = addDays(d, 1)) { const v = porDia.get(d); serie.push({ data: d, faturamento: v?.faturamento ?? 0, lucro: v?.lucro ?? 0, vendas: v?.vendas ?? 0 }) }
       const ultima = sync.map(s => s.last_synced_at).filter(Boolean).sort().pop() ?? null
+      // Até onde os itens das vendas já foram copiados: data do documento no cursor da carga de itens.
+      // Enquanto não chega a hoje, as conclusões que dependem de vendas recentes não são confiáveis.
+      const itens = sync.find(x => x.dataset === 'documento_mercadoria')
+      const docCursor = Array.isArray(itens?.cursor) ? Number(itens!.cursor[0]) : null
+      const [docRef] = docCursor && Number.isSafeInteger(docCursor) ? await db.select<{ datahora: string }>('erp_documento', `_iddocumento=eq.${docCursor}&select=datahora`) : []
+      const vendasAte = docRef ? new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Belem' }).format(new Date(docRef.datahora)) : null
+      const completa = itens?.status === 'ok' || (vendasAte !== null && vendasAte >= addDays(hojeBelem(), -2))
+      // Último mês inteiro já carregado, para o resumo falar de números reais durante a carga.
+      let ultimoMes: { mes: string; kpis: unknown } | null = null
+      if (!completa && vendasAte) {
+        const ini = addDays(vendasAte.slice(0, 8) + '01', -1).slice(0, 8) + '01'
+        const fimMes = vendasAte.slice(0, 8) + '01'
+        const kpis = await db.rpc('resumo_kpis', { p_ini: ini, p_fim: fimMes }).catch(() => null)
+        if (kpis) ultimoMes = { mes: ini.slice(0, 7), kpis }
+      }
       return {
         periodo: { inicio, fim, dias, anterior: { inicio: inicioAnt, fim: addDays(inicio, -1) } },
         atual: soma(inicio, fim), anterior: soma(inicioAnt, addDays(inicio, -1)),
         serie, capital, lotes,
         contagens: { fornecedores_aumento_10pct: aumentos, clientes_em_risco: risco, produtos_em_declinio: declinio },
+        carga: { completa, vendas_ate: vendasAte, ultimo_mes: ultimoMes },
         sync: { ultima_atualizacao: ultima, jobs: sync.length, com_erro: sync.filter(s => s.status === 'error').length, em_andamento: sync.filter(s => s.status === 'running').length },
       }
     }

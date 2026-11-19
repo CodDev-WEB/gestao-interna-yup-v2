@@ -12,8 +12,8 @@ export const brl0 = (v: N) => { const n = num(v); return n === null ? '—' : br
 export const brlCurto = (v: N) => {
   const n = num(v); if (n === null) return '—'
   const a = Math.abs(n)
-  if (a >= 1e6) return `R$ ${decFmt.format(n / 1e6)} mi`
-  if (a >= 1e4) return `R$ ${intFmt.format(n / 1e3)} mil`
+  if (a >= 1e6) return `R$\u00a0${decFmt.format(n / 1e6)}\u00a0mi`
+  if (a >= 1e4) return `R$\u00a0${intFmt.format(n / 1e3)}\u00a0mil`
   return brl0Fmt.format(n)
 }
 export const int = (v: N) => { const n = num(v); return n === null ? '—' : intFmt.format(n) }

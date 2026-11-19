@@ -13,7 +13,6 @@ export function PageHead({ section, title, children, actions }: { section?: stri
   return (
     <header className="page-head">
       <div>
-        <span className="eyebrow">YUP INTELLIGENCE{section ? ` / ${section}` : ''}</span>
         <h1>{title}</h1>
         {children && <p>{children}</p>}
       </div>
