@@ -12,6 +12,7 @@ import { runSync, type SyncOptions } from './sync/engine'
 import { PostgrestStore } from './sync/store'
 import { dash, DashError, salvarSecao } from './dash'
 import { diagnosticar, diagnosticarVarios, lerErro } from './sync/diagnostico'
+import { descobrirColunas } from './erp/descoberta'
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data, null, 2), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
@@ -237,7 +238,7 @@ export default {
           const [settings, states, runs] = await Promise.all([
             db.select('sync_settings', 'id=eq.1&select=auto_enabled,recent_days,updated_at'),
             db.select<{ dataset: string }>('sync_state', 'select=*'),
-            db.select('sync_runs', 'select=id,mode,status,started_at,finished_at,rows_written,erp_requests,error&order=started_at.desc&limit=10'),
+            db.select('sync_runs', 'dataset=neq.erp_schema&select=id,mode,status,started_at,finished_at,rows_written,erp_requests,error&order=started_at.desc&limit=10'),
           ])
           const byName = new Map(states.map(s => [s.dataset, s as { dataset: string; last_error?: string | null }]))
           // Erro de registro: separa a mensagem do detalhe e monta o "o que corrigir" com item, lote e documento.
@@ -339,6 +340,18 @@ export default {
   // A cada 5 minutos. Não faz nada sem os Secrets ou com a sincronização automática desligada.
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (!configured(env)) return
+    // Uma vez só: descobre onde o ERP guarda NCM/CEST e a classificação (esta rodada não sincroniza, pelo limite de subrequests).
+    const db = new Supabase(env)
+    const feita = await db.count('sync_runs', 'dataset=eq.erp_schema').catch(() => 1)
+    if (feita === 0) {
+      ctx.waitUntil((async () => {
+        const inicio = new Date().toISOString()
+        const erp = new ErpClient(env)
+        const resultados = await descobrirColunas(erp)
+        await db.insertMinimal('sync_runs', { dataset: 'erp_schema', mode: 'descoberta', status: 'ok', started_at: inicio, finished_at: new Date().toISOString(), rows_read: 0, rows_written: 0, erp_requests: erp.requests, error: null, details: resultados })
+      })().catch(e => console.error('descoberta falhou', e)))
+      return
+    }
     ctx.waitUntil(
       runSync({ erp: new ErpClient(env), store: new PostgrestStore(new Supabase(env)) }, syncOptions(env, { trigger: 'cron' }))
         .then(r => { if (r.status === 'error' || r.status === 'partial') console.error('sync', r.status, r.message) })
