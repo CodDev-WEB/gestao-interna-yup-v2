@@ -83,6 +83,7 @@ jobs:
           done
 
       # Aplica as migrações (idempotentes) quando a URL de conexão do Postgres estiver nos secrets do GitHub.
+      # Tolera espaços, quebras de linha e aspas coladas junto; diagnostica o formato sem mostrar a senha.
       - name: Apply Supabase migrations
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -91,10 +92,22 @@ jobs:
             echo "::warning::SUPABASE_DB_URL ausente; migrações não aplicadas."
             exit 0
           fi
+          URL=$(printf '%s' "$SUPABASE_DB_URL" | tr -d '\r\n' | sed -e "s/^[[:space:]\"']*//" -e "s/[[:space:]\"']*\$//")
+          case "$URL" in
+            postgres://*|postgresql://*) ;;
+            *) echo "::error::SUPABASE_DB_URL precisa começar com postgresql:// (é a URI do botão Connect > Session pooler no Supabase). O valor cadastrado tem ${#URL} caracteres e começa com outra coisa."; exit 1 ;;
+          esac
+          if printf '%s' "$URL" | grep -q 'YOUR-PASSWORD'; then echo "::error::SUPABASE_DB_URL ainda tem [YOUR-PASSWORD]: troque pelo senha do banco."; exit 1; fi
+          RESTO=${URL#*://}
+          HOST=$(printf '%s' "${RESTO##*@}" | cut -d/ -f1 | cut -d: -f1)
+          echo "Conectando em: $HOST"
+          case "$HOST" in db.*.supabase.co) echo "::warning::Conexão direta (db.*.supabase.co) só funciona por IPv6, que o GitHub não tem. Se falhar, use a URI do Session pooler (*.pooler.supabase.com).";; esac
+          if [ "$(printf '%s' "$RESTO" | tr -cd '@' | wc -c)" -gt 1 ]; then echo "::warning::A URL tem mais de um @: se a senha tiver @, troque por %40."; fi
           for f in supabase/migrations/*.sql; do
             echo "Aplicando $f"
-            psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -q -f "$f"
+            psql "$URL" -v ON_ERROR_STOP=1 -q -f "$f"
           done
+          echo "Migrações aplicadas."
 
       - name: Smoke test deployed Worker
         run: |
