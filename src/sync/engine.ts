@@ -41,6 +41,8 @@ export interface SyncResult {
 
 const LOCK_TTL_SECONDS = 900
 const ERROR_RETRY_MINUTES = 15
+// Limita o tempo de cada conjunto por execução para distribuir o orçamento entre os jobs.
+const MAX_PAGES_PER_JOB = 4
 
 class Budget {
   constructor(private left: number) {}
@@ -80,7 +82,7 @@ export function isDue(d: Dataset, s: JobState, now: Date): boolean {
 
 const sameKey = (a: Value[] | null, b: Value[]) => !!a && a.length === b.length && a.every((v, i) => v === b[i])
 
-/** Processa páginas de um job até completar o ciclo ou acabar o orçamento. */
+/** Processa até quatro páginas por job; o cursor salvo permite continuar no próximo cron. */
 async function runJob(d: Dataset, s: JobState, deps: { erp: ErpLike; store: Store }, budget: Budget, opts: SyncOptions & { recentDays: number }, summary: JobSummary) {
   const now = () => (opts.now ?? (() => new Date()))()
   if (!s.cycle_started_at) {
@@ -89,7 +91,7 @@ async function runJob(d: Dataset, s: JobState, deps: { erp: ErpLike; store: Stor
     if (d.kind !== 'append') s.cursor = null
     s.window_from = d.kind === 'recent' ? addDays(localDate(opts.timeZone, now()), -opts.recentDays) : null
   }
-  for (;;) {
+  for (let page = 0; page < MAX_PAGES_PER_JOB; page++) {
     if (budget.remaining < 3) return
     const sql = buildSelect(d, s.cursor, s.window_from)
     budget.take()
@@ -212,7 +214,8 @@ export async function runSync(deps: { erp: ErpLike; store: Store }, opts: SyncOp
     const result = fatal
       ? base('error', fatal)
       : errors.length ? base('partial', `${errors.length} job(s) com erro: ${errors.map(j => `${j.dataset}: ${j.error}`).join(' | ').slice(0, 1000)}`)
-        : base('ok', jobs.length ? (pending ? 'Execução parcial; continua na próxima.' : 'Jobs devidos concluídos.') : 'Nada a sincronizar agora.')
+        : pending ? base('partial', 'Execução parcial; os jobs pendentes continuam na próxima execução.')
+          : base('ok', jobs.length ? 'Jobs devidos concluídos.' : 'Nada a sincronizar agora.')
     await deps.store.insertRun({ trigger: opts.trigger, status: result.status, started_at: startedAt, finished_at: now().toISOString(), rows_read: result.rows, rows_written: result.rows, erp_requests: deps.erp.requests, error: result.status === 'ok' ? null : result.message, details: { jobs } }).catch(() => undefined)
     return result
   } finally {
