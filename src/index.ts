@@ -346,7 +346,7 @@ export default {
   },
 
   // A cada 5 minutos. Não faz nada sem os Secrets ou com a sincronização automática desligada.
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (!configured(env)) return
     // Uma vez só: descobre onde o ERP guarda NCM/CEST e a classificação (esta rodada não sincroniza, pelo limite de subrequests).
     const db = new Supabase(env)
@@ -360,10 +360,13 @@ export default {
       })().catch(e => console.error('descoberta falhou', e)))
       return
     }
+    // A cada 15 minutos, depois da sincronização: recalcula a curva ABC pronta (mv_produto_abc) usada pelas telas de gestão.
+    const atualizarGestao = new Date(controller.scheduledTime).getUTCMinutes() % 15 === 0
     ctx.waitUntil(
       runSync({ erp: new ErpClient(env), store: new PostgrestStore(new Supabase(env)) }, syncOptions(env, { trigger: 'cron' }))
         .then(r => { if (r.status === 'error' || r.status === 'partial') console.error('sync', r.status, r.message) })
-        .catch(e => console.error('sync falhou', e)),
+        .catch(e => console.error('sync falhou', e))
+        .then(() => atualizarGestao ? db.rpc('atualizar_gestao', {}).catch(e => console.error('atualizar_gestao falhou', e)) : undefined),
     )
   },
 } satisfies ExportedHandler<Env>

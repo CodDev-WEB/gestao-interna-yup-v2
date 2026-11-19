@@ -310,6 +310,9 @@ await test('views: clientes, setores, declínio e resumo executam', async () => 
   assert.equal(Number(resumo.produtos_sem_saida), 1); assert.equal(Number(resumo.lotes_criticos), 1); assert.equal(Number(resumo.itens_aumento_custo_10pct), 1)
 })
 await test('gestão do estoque: curva ABC, reposição, qualidade, contagem e custo-serviço', async () => {
+  await sb.query('select atualizar_gestao()')
+  const mv = await count(sb, 'select count(*) as n from mv_produto_abc')
+  assert.equal(mv, await count(sb, 'select count(*) as n from vw_produto_abc'))
   const abc = (await sb.query<{ idmercadoriavariacao: string; classe: string; posicao: string; acumulado_pct: string }>('select * from vw_produto_abc order by posicao')).rows
   assert.ok(abc.length > 0)
   assert.equal(abc[0].classe, 'A')
@@ -327,6 +330,7 @@ await test('gestão do estoque: curva ABC, reposição, qualidade, contagem e cu
   assert.ok(await count(sb, `select count(*) as n from vw_contagem_pendente where idmercadoriavariacao = ${id}`) === 1)
   await sb.query(`insert into cnt_contagem (idmercadoriavariacao, qtd_contada, qtd_sistema, custo_unitario, classe) values (${id}, 5, 5, 10, 'A')`)
   assert.ok(await count(sb, `select count(*) as n from vw_contagem_pendente where idmercadoriavariacao = ${id}`) === 0)
+  assert.ok(await count(sb, `select coalesce(sum(pendentes), 0) as n from vw_contagem_resumo`) > 0)
   const ac = await one<Record<string, string>>(`select * from vw_contagem_acuracia where classe = 'A'`)
   assert.equal(Number(ac.acuracia_pct), 100); assert.equal(Number(ac.contados), 1)
   await sb.query('delete from cnt_contagem')
