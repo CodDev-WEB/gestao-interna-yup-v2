@@ -194,11 +194,11 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       const limit = int(q.get('limit'), 50, 1, 200), offset = int(q.get('offset'), 0, 0, 1_000_000)
       const faixa = pick(q.get('faixa'), FAIXAS), s = busca(q.get('busca'))
       const filtro = (faixa ? `&faixa=eq.${faixa}` : '&faixa=neq.normal') + (q.get('risco') === '1' ? '&risco_perda=is.true' : '') + (s ? ilike('descricao', s) : '')
-      return db.selectPage('vw_lote_validade', `select=*${filtro}${order(q.get('ordem'), ['dias_para_vencer', 'valor_em_risco', 'qtdsaldo'], 'dias_para_vencer', q.get('dir') ?? 'asc')}`, limit, offset)
+      return db.selectPage('vw_lote_disponivel', `select=*${filtro}${order(q.get('ordem'), ['dias_para_vencer', 'valor_em_risco', 'qtdsaldo'], 'dias_para_vencer', q.get('dir') ?? 'asc')}`, limit, offset)
     }
 
     case 'lotes-resumo':
-      return db.select('vw_lote_resumo', 'select=*')
+      return db.select('vw_validade_resumo', 'select=*').catch(() => db.select('vw_lote_resumo', 'select=*'))
 
     case 'fornecedores': {
       const limit = int(q.get('limit'), 50, 1, 200), offset = int(q.get('offset'), 0, 0, 1_000_000), s = busca(q.get('busca'))

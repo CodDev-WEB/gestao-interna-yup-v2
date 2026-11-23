@@ -433,6 +433,25 @@ await test('auditoria ERP × sistema: tudo bate; um centavo a mais no sistema ap
   assert.ok(Array.isArray(det.vendidos) && Array.isArray(det.meses))
 })
 
+await test('validade pelo disponível: estoque repartido entre os lotes, o que vence primeiro saiu primeiro', async () => {
+  // Item 777: 5 unidades em estoque; lotes registrados com 10 (vence em 10 dias), 3 (vence em 100 dias) e 4 (vencido).
+  await sb.exec(`insert into erp_mercadoria_estoque (_idempresa, _idlocalestoque, _idmercadoriavariacao, qtdsaldo) values (1, 1, 777, 5)`)
+  await sb.exec(`insert into erp_mercadoria_estoque_lote (_idempresa, _idlocalestoque, _idmercadoriavariacao, _lote, _dtvalidade, _dtentrada, qtdsaldo) values
+    (1, 1, 777, 'A', '${day(10)}', '${day(-30)}', 10), (1, 1, 777, 'B', '${day(100)}', '${day(-5)}', 3), (1, 1, 777, 'V', '${day(-2)}', '${day(-90)}', 4)`)
+  try {
+    const rows = (await sb.query<{ lote: string; qtdsaldo: string; qtd_lote: string; qtd_ja_saiu: string }>(`select lote, qtdsaldo::text, qtd_lote::text, qtd_ja_saiu::text from vw_lote_disponivel where idmercadoriavariacao = 777 order by lote`)).rows
+    assert.deepEqual(rows.map(r => [r.lote, Number(r.qtdsaldo), Number(r.qtd_ja_saiu)]), [['A', 2, 8], ['B', 3, 0]], 'lote vencido já saiu; o de validade mais longa fica inteiro')
+    assert.equal(await count(sb, `select count(*) as n from vw_lote_validade where idmercadoriavariacao = 777`), 2)
+    const soma = await one<{ s: string }>(`select sum(qtdsaldo)::text as s from vw_lote_validade where idmercadoriavariacao = 777`)
+    assert.equal(Number(soma.s), 5, 'nunca mais que o estoque')
+    await sb.exec(`update erp_mercadoria_estoque set qtdsaldo = 0 where _idmercadoriavariacao = 777`)
+    assert.equal(await count(sb, `select count(*) as n from vw_lote_validade where idmercadoriavariacao = 777`), 0, 'sem estoque, nada a conferir')
+  } finally {
+    await sb.exec(`delete from erp_mercadoria_estoque_lote where _idmercadoriavariacao = 777`)
+    await sb.exec(`delete from erp_mercadoria_estoque where _idmercadoriavariacao = 777`)
+  }
+})
+
 // ---------- Mudanças no ERP ----------
 await erp.exec(`update documento set status = 'C' where _iddocumento = 11`)
 await erp.exec(`delete from mercadoria_estoque_lote where _lote = 'L2'`)

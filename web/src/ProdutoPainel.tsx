@@ -14,7 +14,7 @@ import { situacao } from './labels'
 import { Empty, ErrorState, Loading, Metric, Tabs } from './ui'
 
 type Entrada = { iddocumento: number; datahora: string | null; data: string; idfornecedor: number | null; fornecedor: string | null; natureza: string | null; qtd: number; unidades: number; preco_nota: number | null; preco_unidade: number | null; total: number | null; custo_unitario: number | null; lote: string | null; dtvalidade: string | null }
-type Lote = { lote: string; dtentrada: string; dtfabricacao: string | null; dtvalidade: string; dias_para_vencer: number; qtdsaldo: number; local: string; valor: number | null; entrada: Entrada | null }
+type Lote = { lote: string; dtentrada: string; dtfabricacao: string | null; dtvalidade: string; dias_para_vencer: number; qtdsaldo: number; qtd_lote: number; qtd_ja_saiu: number; local: string; valor: number | null; entrada: Entrada | null }
 type Evento = { quando: string; tipo: string; titulo: string; detalhe?: string; valor?: number | null; futuro: boolean }
 type Ficha = {
   hoje: string
@@ -61,7 +61,7 @@ const dataHora = (v: string | null | undefined) => {
 }
 
 function validadePill(l: Lote) {
-  if (l.qtdsaldo <= 0) return <span className="pill neutral">Zerado</span>
+  if (l.qtdsaldo <= 0) return <span className="pill neutral">{l.qtd_lote > 0 ? 'Já saiu' : 'Zerado'}</span>
   if (l.dias_para_vencer < 0) return <span className="pill bad">Vencido há {-l.dias_para_vencer} d</span>
   if (l.dias_para_vencer <= 30) return <span className="pill bad">Vence em {l.dias_para_vencer} d</span>
   if (l.dias_para_vencer <= 90) return <span className="pill warn">Vence em {l.dias_para_vencer} d</span>
@@ -146,18 +146,19 @@ function Lotes({ f }: { f: Ficha }) {
   return (
     <>
       <div className="controls">
-        <span className="muted">{int(ativos.length)} {ativos.length === 1 ? 'lote com saldo' : 'lotes com saldo'} · {dec(ativos.reduce((a, l) => a + l.qtdsaldo, 0))} un. em lotes{qZerados > 0 && ` · ${int(qZerados)} já zerados`}</span>
-        {qZerados > 0 && <button type="button" className="chip" aria-pressed={zerados} onClick={() => setZerados(z => !z)}>Mostrar lotes zerados</button>}
+        <span className="muted">{int(ativos.length)} {ativos.length === 1 ? 'lote disponível' : 'lotes disponíveis'} · {dec(ativos.reduce((a, l) => a + l.qtdsaldo, 0))} un. disponíveis{qZerados > 0 && ` · ${int(qZerados)} já saíram`}</span>
+        {qZerados > 0 && <button type="button" className="chip" aria-pressed={zerados} onClick={() => setZerados(z => !z)}>Mostrar lotes que já saíram</button>}
       </div>
-      {lista.length === 0 ? <Empty>Nenhum lote com saldo.</Empty> : (
+      <p className="hint">O ERP não baixa o lote na venda. Aqui o disponível é o estoque atual do item repartido entre os lotes: o que vence primeiro é considerado vendido primeiro.</p>
+      {lista.length === 0 ? <Empty>Nenhum lote com unidades disponíveis.</Empty> : (
         <div className="table-wrap cards-sm"><table><caption className="sr-only">Lotes do item</caption>
-          <thead><tr><th>Lote</th><th>Entrada</th><th>Validade</th><th className="r">Saldo</th><th className="r">Valor (custo)</th><th>Situação</th></tr></thead>
+          <thead><tr><th>Lote</th><th>Entrada</th><th>Validade</th><th className="r">Disponível</th><th className="r">Valor (custo)</th><th>Situação</th></tr></thead>
           <tbody>{lista.map((l, i) => (
             <tr key={i}>
               <td><span className="title">Lote {l.lote}</span><small>{l.local}{l.dtfabricacao ? ` · fabricado ${fmtData(l.dtfabricacao)}` : ''}</small></td>
               <td data-label="Entrada">{fmtData(l.dtentrada)}{l.entrada && <small>{dec(l.entrada.qtd)} un. · {l.entrada.fornecedor ?? 'fornecedor —'}</small>}</td>
               <td data-label="Validade">{fmtData(l.dtvalidade)}</td>
-              <td className="r" data-label="Saldo">{dec(l.qtdsaldo)}</td>
+              <td className="r" data-label="Disponível">{dec(l.qtdsaldo)}{l.qtd_ja_saiu > 0 && <small>de {dec(l.qtd_lote)} no lote</small>}</td>
               <td className="r money" data-label="Valor (custo)">{brl(l.valor)}</td>
               <td data-label="Situação">{validadePill(l)}</td>
             </tr>

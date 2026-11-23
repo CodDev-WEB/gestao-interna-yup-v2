@@ -129,13 +129,24 @@ export async function produtoDetalhe(id: number, db: Supabase) {
   if (precoCompra.length > 1 && isFinite(menorUltimo)) for (const p of precoCompra) p.mais_barato = p.ultimo_preco === menorUltimo
   const ultimaEntrada = entradas.find(e => e.preco_unidade !== null)
 
+  // O ERP não baixa o saldo do lote na venda: o disponível de cada lote é o estoque do local repartido entre
+  // os lotes, do que vence por último para o que vence primeiro (sai primeiro o que vence primeiro).
+  const disponivelLote = new Map<Row, number>()
+  for (const chave of new Set(lotes.map(l => `${l._idempresa}|${l._idlocalestoque}`))) {
+    const [emp, loc] = chave.split('|')
+    let resta = Math.max(0, estoque.filter(e => String(e._idempresa) === emp && String(e._idlocalestoque) === loc).reduce((a, e) => a + (num(e.qtdsaldo as Num) ?? 0), 0))
+    const doLocal = lotes.filter(l => `${l._idempresa}|${l._idlocalestoque}` === chave && (num(l.qtdsaldo as Num) ?? 0) > 0)
+      .sort((a, b) => String(b._dtvalidade).localeCompare(String(a._dtvalidade)) || String(b._dtentrada).localeCompare(String(a._dtentrada)))
+    for (const l of doLocal) { const q = Math.min(num(l.qtdsaldo as Num) ?? 0, resta); disponivelLote.set(l, q); resta -= q }
+  }
   const lotesOut = lotes.map(l => {
     const validade = String(l._dtvalidade)
     const dias = diasEntre(hoje, validade)
+    const registrado = num(l.qtdsaldo as Num) ?? 0, disp = disponivelLote.get(l) ?? 0
     return {
       lote: l._lote, dtentrada: l._dtentrada, dtfabricacao: l.dtfabricacao ?? null, dtvalidade: validade, dias_para_vencer: dias,
-      qtdsaldo: num(l.qtdsaldo as Num) ?? 0, local: local(l._idempresa, l._idlocalestoque) ?? `Local ${l._idlocalestoque}`,
-      valor: custo !== null ? (num(l.qtdsaldo as Num) ?? 0) * custo : null,
+      qtdsaldo: disp, qtd_lote: registrado, qtd_ja_saiu: Math.max(0, registrado - disp), local: local(l._idempresa, l._idlocalestoque) ?? `Local ${l._idlocalestoque}`,
+      valor: custo !== null ? disp * custo : null,
       // Entrada que trouxe este lote, quando a nota informa lote/validade.
       entrada: entradas.find(e => e.lote === l._lote && (!e.dtvalidade || e.dtvalidade === validade)) ?? null,
     }
