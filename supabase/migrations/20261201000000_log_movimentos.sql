@@ -39,7 +39,7 @@ select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
        d._iddocumento as iddocumento,
        nullif(trim(concat_ws(' ', d.modelo, d.numero)), '') as documento,
        d.idusuario,
-       nullif(trim(concat_ws(' ', pu.nome, pu.sobrenome)), '') as usuario,
+       coalesce(nullif(trim(concat_ws(' ', pu.nome, pu.sobrenome)), ''), case when d.idusuario is not null then 'Usuário nº ' || d.idusuario end) as usuario,
        d.idpessoa,
        nullif(trim(concat_ws(' ', pp.nome, pp.sobrenome)), '') as pessoa,
        it.valor,
@@ -54,7 +54,11 @@ select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
          group by x._iddocumento, x._idlocalestoque, x.idmercadoriavariacao) h
   left join public.erp_documento d on d._iddocumento = h._iddocumento
   left join public.erp_natureza_operacao n on n._idnatureza = d.idnaturezaoperacao and n._idempresa = d.idempresa
-  left join public.erp_pessoa pu on pu._idpessoa = d.idusuario
+  -- documento.idusuario é o usuário do ERP; o nome vem do funcionário ligado a ele (pessoa_funcionario).
+  left join lateral (
+    select p2.nome, p2.sobrenome from public.erp_pessoa_funcionario f join public.erp_pessoa p2 on p2._idpessoa = f._idpessoa
+     where f.idusuario = d.idusuario and f.idusuario <> 0 and f.sync_deleted_at is null
+     order by (f._idempresa = d.idempresa) desc, f.flaginativo nulls last limit 1) pu on true
   left join public.erp_pessoa pp on pp._idpessoa = d.idpessoa
   left join lateral (
     select sum(dm.valtotalliquido) as valor,
@@ -113,7 +117,7 @@ select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
        d._iddocumento as iddocumento,
        nullif(trim(concat_ws(' ', d.modelo, d.numero)), '') as documento,
        d.idusuario,
-       nullif(trim(concat_ws(' ', pu.nome, pu.sobrenome)), '') as usuario,
+       coalesce(nullif(trim(concat_ws(' ', pu.nome, pu.sobrenome)), ''), case when d.idusuario is not null then 'Usuário nº ' || d.idusuario end) as usuario,
        d.idpessoa,
        nullif(trim(concat_ws(' ', pp.nome, pp.sobrenome)), '') as pessoa,
        it.valor,
@@ -129,7 +133,11 @@ select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
          group by x._iddocumento, x._idlocalestoque, x.idmercadoriavariacao) h
   left join public.erp_documento d on d._iddocumento = h._iddocumento
   left join public.erp_natureza_operacao n on n._idnatureza = d.idnaturezaoperacao and n._idempresa = d.idempresa
-  left join public.erp_pessoa pu on pu._idpessoa = d.idusuario
+  -- documento.idusuario é o usuário do ERP; o nome vem do funcionário ligado a ele (pessoa_funcionario).
+  left join lateral (
+    select p2.nome, p2.sobrenome from public.erp_pessoa_funcionario f join public.erp_pessoa p2 on p2._idpessoa = f._idpessoa
+     where f.idusuario = d.idusuario and f.idusuario <> 0 and f.sync_deleted_at is null
+     order by (f._idempresa = d.idempresa) desc, f.flaginativo nulls last limit 1) pu on true
   left join public.erp_pessoa pp on pp._idpessoa = d.idpessoa
   left join lateral (
     select sum(dm.valtotalliquido) as valor,
@@ -163,9 +171,11 @@ end $$;
 create or replace function public.log_usuarios() returns jsonb
 language sql stable security definer set search_path = public, pg_catalog as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', u.id, 'nome', u.nome, 'movimentos', u.n) order by u.n desc), '[]'::jsonb)
-    from (select d.idusuario as id, coalesce(nullif(trim(concat_ws(' ', p.nome, p.sobrenome)), ''), 'Usuário ' || d.idusuario) as nome, count(*) as n
-            from public.erp_documento d left join public.erp_pessoa p on p._idpessoa = d.idusuario
-           where d.idusuario is not null group by 1, 2) u
+    from (select d.idusuario as id, coalesce(max(nullif(trim(concat_ws(' ', p.nome, p.sobrenome)), '')), 'Usuário nº ' || d.idusuario) as nome, count(distinct d._iddocumento) as n
+            from public.erp_documento d
+            left join public.erp_pessoa_funcionario f on f.idusuario = d.idusuario and f.idusuario <> 0 and f.sync_deleted_at is null
+            left join public.erp_pessoa p on p._idpessoa = f._idpessoa
+           where d.idusuario is not null group by d.idusuario) u
 $$;
 
 do $$

@@ -73,6 +73,8 @@ const C = {
   mercadoria_marca: cols('_idmarca, descricao, flaginativo'),
   natureza_operacao: cols('_idempresa, _idnatureza, descricao, tipomovimento, tipocategoria, cfop, flagmovimentarestoque, flagmovimentarfinanceiro, flagmovimentarcusto, flaginativo'),
   local_estoque: cols('_idempresa, _idlocal, descricao, flaginativo'),
+  // Ligação funcionário (pessoa) ↔ usuário do ERP: documento.idusuario é o usuário, não a pessoa.
+  pessoa_funcionario: cols('_idempresa, _idpessoa, idusuario, tipo, flaginativo, idequipe'),
   pessoa: cols('_idpessoa, nome, sobrenome, tipo, idgrupo, datacadastro, dataalteracao, dataclientedesde, flaginativo'),
   mercadoria_fornecedor: cols('_idmercadoriavariacao, _idpessoa, _embalagem, qtdfator, codigoexterno'),
   mercadoria_custo: cols('_idempresa, _idmercadoriavariacao, valcusto, valcustomedio, datahora'),
@@ -118,6 +120,7 @@ export const DATASETS: Dataset[] = [
   ds('ncm', 'ncm', 'snapshot', 1440, 'Descrições oficiais dos NCMs usados nos produtos', undefined,
     't._ncm IN (SELECT m.ncm FROM mercadoria m WHERE m.ncm IS NOT NULL UNION SELECT v.ncm FROM mercadoria_variacao v WHERE v.ncm IS NOT NULL)'),
   ds('pessoa', 'pessoa', 'snapshot', 1440, 'Clientes, fornecedores e funcionários (sem documentos pessoais)'),
+  ds('pessoa_funcionario', 'pessoa_funcionario', 'snapshot', 1440, 'Funcionários e o usuário de cada um no ERP (quem lançou cada documento)', undefined, SO_YUP),
   ds('mercadoria_fornecedor', 'mercadoria_fornecedor', 'snapshot', 1440, 'Fornecedores de cada variação'),
   ds('mercadoria_estoque', 'mercadoria_estoque', 'snapshot', 360, 'Saldo atual por local', undefined, SO_YUP),
   ds('mercadoria_custo', 'mercadoria_custo', 'snapshot', 1440, 'Custo e custo médio atuais', undefined, SO_YUP),

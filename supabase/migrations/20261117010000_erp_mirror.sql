@@ -218,6 +218,20 @@ alter table public.erp_pessoa add column if not exists flaginativo text;
 alter table public.erp_pessoa enable row level security;
 create index if not exists erp_pessoa_seen_idx on public.erp_pessoa (sync_seen_at);
 
+create table if not exists public.erp_pessoa_funcionario (
+  _idempresa bigint not null,
+  _idpessoa bigint not null,
+  sync_seen_at timestamptz not null default now(),
+  sync_deleted_at timestamptz,
+  primary key (_idempresa, _idpessoa)
+);
+alter table public.erp_pessoa_funcionario add column if not exists idusuario bigint;
+alter table public.erp_pessoa_funcionario add column if not exists tipo text;
+alter table public.erp_pessoa_funcionario add column if not exists flaginativo text;
+alter table public.erp_pessoa_funcionario add column if not exists idequipe bigint;
+alter table public.erp_pessoa_funcionario enable row level security;
+create index if not exists erp_pessoa_funcionario_seen_idx on public.erp_pessoa_funcionario (sync_seen_at);
+
 create table if not exists public.erp_mercadoria_fornecedor (
   _idmercadoriavariacao bigint not null,
   _idpessoa bigint not null,
