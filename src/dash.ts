@@ -275,6 +275,32 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       }
     }
 
+    // ---------- Auditoria e vendedoras ----------
+    // Última auditoria ERP × sistema (ao centavo) e o histórico das últimas rodadas.
+    case 'auditoria': {
+      const [ultima] = await db.select('sync_runs', 'dataset=eq.auditoria&status=neq.error&select=started_at,finished_at,status,details&order=started_at.desc&limit=1')
+      const historico = await db.select('sync_runs', 'dataset=eq.auditoria&select=started_at,finished_at,status,error&order=started_at.desc&limit=10')
+      return { ultima: ultima ?? null, historico }
+    }
+
+    // Por vendedora no período: vendido, devoluções e o que ela comprou como cliente.
+    case 'vendedoras':
+    case 'vendedora': {
+      const fim = hojeBelem()
+      const de = ISO.test(q.get('de') ?? '') ? q.get('de')! : fim.slice(0, 8) + '01'
+      const ate = ISO.test(q.get('ate') ?? '') ? q.get('ate')! : fim
+      if (de > ate) throw new DashError('A data inicial é depois da final.')
+      try {
+        if (path === 'vendedoras') return { de, ate, vendedoras: await db.rpc('vendedoras_resumo', { p_de: de, p_ate: ate }) }
+        const id = int(q.get('id'), -1, 0, 2_000_000_000)
+        if (id < 0) throw new DashError('Vendedora inválida.')
+        return { de, ate, ...(await db.rpc<Record<string, unknown>>('vendedora_detalhe', { p_id: id, p_de: de, p_ate: ate })) }
+      } catch (e) {
+        if (e instanceof SupabaseError && (e.status === 404 || /vendedora|PGRST202/.test(e.message))) throw new DashError('O painel de vendedoras ainda não foi instalado no banco (migração 20261124000000_auditoria_vendedoras.sql).')
+        throw e
+      }
+    }
+
     case 'meses':
       return db.select('vw_meses_movimento', 'select=mes,documentos&order=mes.desc').catch(() => [])
 

@@ -16,6 +16,7 @@ import { isDue, runSync, emptyState, type ErpLike } from '../src/sync/engine'
 import type { JobState, RunRecord, Settings, Store } from '../src/sync/store'
 import type { Aviso, TypedRow } from '../src/sync/convert'
 import { mirrorSql } from '../scripts/mirror-sql'
+import { auditar, comparar, texto, unidades } from '../src/auditoria'
 
 let passed = 0
 async function test(name: string, fn: () => unknown | Promise<unknown>) {
@@ -36,6 +37,16 @@ await test('toTimestamp: hora local sem fuso vira instante com -03:00', () => {
   assert.equal(toTimestamp('2026-11-10T17:22:33Z', '-03:00'), '2026-11-10T17:22:33.000Z')
   assert.throws(() => toTimestamp('2026-02-30 10:00', '-03:00'))
   assert.throws(() => toTimestamp('ontem', '-03:00'))
+})
+await test('auditoria: valores em centavos sem erro de ponto flutuante', () => {
+  assert.equal(unidades('7686108.75', 2), 768610875n)
+  assert.equal(unidades(0.1 + 0.2, 2), 30n)
+  assert.equal(unidades('-1.005', 2), -101n)
+  assert.equal(unidades('12.3456', 3), 12346n)
+  assert.equal(unidades(null, 2), 0n)
+  assert.equal(texto(-5n, 2), '-0.05'); assert.equal(texto(123456n, 2), '1234.56'); assert.equal(texto(7n, 0), '7')
+  const r = comparar([{ mes: '2026-10', valor: '10.00' }, { mes: '2026-09', valor: 5 }], [{ mes: '2026-10', valor: 10.01 }], ['mes'], ['valor'], () => 'vendas')
+  assert.deepEqual(r.map(l => [l.mes, l.ok, l.diferenca.valor]), [['2026-10', false, '0.01'], ['2026-09', false, '-5.00']])
 })
 await test('convertValue: números BR, inteiros, datas, vazio', () => {
   assert.equal(convertValue('num', '1.234,56', '-03:00'), 1234.56)
@@ -380,6 +391,41 @@ await test('resumo do mês: vendas, compras, rankings e histórico batem com as 
   assert.ok(f, 'fornecedor 500 deveria aparecer nas compras do mês')
   assert.equal(f.nome, "DISTRIBUIDORA D'OESTE")
   assert.ok(Number(f.valor) >= 110)
+})
+
+await test('auditoria ERP × sistema: tudo bate; um centavo a mais no sistema aparece na hora', async () => {
+  const api = new FakeErp(25, 17)
+  const erpAll = {
+    get requests() { return api.requests },
+    async all(sql: string) {
+      const rows: Record<string, unknown>[] = []
+      for (;;) { const { rows: p } = await api.page(sql, rows.length); if (!p.length) return { rows, pages: 0, complete: true }; rows.push(...p) }
+    },
+  }
+  const db = { rpc: async (fn: string, a: Record<string, unknown>) => (await sb.query<{ r: unknown }>(`select ${fn}(${Object.keys(a).map((_, i) => `$${i + 1}`).join(', ')}) as r`, Object.values(a))).rows[0].r }
+  const rodar = () => auditar(erpAll as never, db as never, t0)
+  const a = await rodar()
+  assert.ok(a.classes.length > 0)
+  assert.deepEqual(a.classes.filter(l => !l.ok), [], 'classes divergentes')
+  assert.equal(a.ok, true, JSON.stringify({ estoque: a.estoque, orfaos: a.orfaos, vend: a.vendedoras.filter(l => !l.ok) }))
+  const vendas = a.grupos.find(g => g.grupo === 'vendas')!
+  const vw = await one<{ s: string }>(`select coalesce(sum(valtotalliquido), 0)::text as s from vw_venda_item where datahora < '${a.periodo_ate}T00:00:00-03:00'`)
+  assert.equal(unidades(vendas.sistema.valor, 2), unidades(vw.s, 2), 'auditoria e telas usam a mesma base de vendas')
+  await sb.exec(`update erp_documento_mercadoria set valtotalliquido = valtotalliquido + 0.01 where _iddocumento = 10 and _idsequencia = 1`)
+  try {
+    const b = await rodar()
+    assert.equal(b.ok, false)
+    const g = b.grupos.find(x => x.grupo === 'vendas')!
+    assert.equal(g.diferenca.valor, '0.01')
+    assert.equal(b.classes.filter(l => !l.ok).length, 1)
+    assert.equal(b.vendedoras.filter(l => !l.ok).length, 1)
+  } finally { await sb.exec(`update erp_documento_mercadoria set valtotalliquido = valtotalliquido - 0.01 where _iddocumento = 10 and _idsequencia = 1`) }
+  const ini = day(-120), fim = day(0)
+  const vend = (await sb.query<{ r: { liquido: string }[] }>(`select vendedoras_resumo('${ini}', '${fim}') as r`)).rows[0].r
+  const total = await one<{ s: string }>(`select coalesce(sum(valtotalliquido), 0)::text as s from vw_venda_item where data between '${ini}' and '${fim}'`)
+  assert.equal(vend.reduce((x, v) => x + unidades(v.liquido, 2), 0n), unidades(total.s, 2), 'soma das vendedoras = total vendido')
+  const det = (await sb.query<{ r: { vendidos: unknown[]; meses: unknown[] } }>(`select vendedora_detalhe(0, '${ini}', '${fim}') as r`)).rows[0].r
+  assert.ok(Array.isArray(det.vendidos) && Array.isArray(det.meses))
 })
 
 // ---------- Mudanças no ERP ----------

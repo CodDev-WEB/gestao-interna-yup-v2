@@ -13,6 +13,7 @@ import { PostgrestStore } from './sync/store'
 import { dash, DashError, salvarContagem, salvarRegraNcm, salvarSecao } from './dash'
 import { diagnosticar, diagnosticarVarios, lerErro } from './sync/diagnostico'
 import { descobrirColunas } from './erp/descoberta'
+import { auditarEGravar } from './auditoria'
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data, null, 2), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
@@ -236,7 +237,7 @@ export default {
         case 'GET /api/supabase/test': {
           const db = new Supabase(env)
           const [settings] = await db.select('sync_settings', 'id=eq.1&select=auto_enabled,recent_days')
-          const runs = await db.select('sync_runs', 'select=id,started_at,status&order=started_at.desc&limit=1')
+          const runs = await db.select('sync_runs', 'dataset=not.in.(erp_schema,auditoria)&select=id,started_at,status&order=started_at.desc&limit=1')
           return json({ ok: true, settings: settings ?? null, last_run: runs[0] ?? null })
         }
 
@@ -246,7 +247,7 @@ export default {
           const [settings, states, runs] = await Promise.all([
             db.select('sync_settings', 'id=eq.1&select=auto_enabled,recent_days,updated_at'),
             db.select<{ dataset: string }>('sync_state', 'select=*'),
-            db.select('sync_runs', 'dataset=neq.erp_schema&select=id,mode,status,started_at,finished_at,rows_written,erp_requests,error&order=started_at.desc&limit=10'),
+            db.select('sync_runs', 'dataset=not.in.(erp_schema,auditoria)&select=id,mode,status,started_at,finished_at,rows_written,erp_requests,error&order=started_at.desc&limit=10'),
           ])
           const byName = new Map(states.map(s => [s.dataset, s as { dataset: string; last_error?: string | null }]))
           // Erro de registro: separa a mensagem do detalhe e monta o "o que corrigir" com item, lote e documento.
@@ -264,7 +265,7 @@ export default {
             abertos = pg.rows; totalAvisos = pg.total
           } catch {
             tabelaAvisos = false
-            const det = await db.select<{ details: { jobs?: { avisos_nao_gravados?: AvisoRow[] }[] } | null }>('sync_runs', 'select=details&order=started_at.desc&limit=30').catch(() => [])
+            const det = await db.select<{ details: { jobs?: { avisos_nao_gravados?: AvisoRow[] }[] } | null }>('sync_runs', 'dataset=not.in.(erp_schema,auditoria)&select=details&order=started_at.desc&limit=30').catch(() => [])
             abertos = [...new Map(det.flatMap(r => (r.details?.jobs ?? []).flatMap(j => j.avisos_nao_gravados ?? [])).map(a => [a.chave, a])).values()].slice(0, 30)
             totalAvisos = abertos.length
           }
@@ -330,6 +331,12 @@ export default {
           return json({ ok: true, settings })
         }
 
+        // Auditoria de valores ERP × sistema, ao centavo (~10 consultas ao ERP, ~40 s). Também roda todo dia às 6h.
+        case 'POST /api/auditoria/run': {
+          const r = await auditarEGravar(new ErpClient(env), new Supabase(env))
+          return json({ ok: true, auditoria: { ok: r.ok, divergencias: r.divergencias, gerado_em: r.gerado_em } })
+        }
+
         // Recomeça um job do zero (ex.: depois de corrigir um erro de dados). {"datasets": ["documento"]}
         case 'POST /api/sync/reset': {
           const list = pickDatasets(await body(req), [])
@@ -358,6 +365,12 @@ export default {
         const resultados = await descobrirColunas(erp)
         await db.insertMinimal('sync_runs', { dataset: 'erp_schema', mode: 'descoberta', status: 'ok', started_at: inicio, finished_at: new Date().toISOString(), rows_read: 0, rows_written: 0, erp_requests: erp.requests, error: null, details: resultados })
       })().catch(e => console.error('descoberta falhou', e)))
+      return
+    }
+    // Uma vez por dia, às 6h de Belém (9h UTC): auditoria de valores no lugar da sincronização desta rodada.
+    const quando = new Date(controller.scheduledTime)
+    if (quando.getUTCHours() === 9 && quando.getUTCMinutes() < 5) {
+      ctx.waitUntil(auditarEGravar(new ErpClient(env), db).catch(e => console.error('auditoria falhou', e)))
       return
     }
     // A cada 15 minutos, depois da sincronização: recalcula a curva ABC pronta (mv_produto_abc) usada pelas telas de gestão.
