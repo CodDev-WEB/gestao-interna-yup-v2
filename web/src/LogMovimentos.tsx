@@ -11,7 +11,7 @@ import { Empty, ErrorState, Loading } from './ui'
 export type Mov = {
   id: string; origem: 'estoque' | 'preco'; datahora: string; idmercadoriavariacao: number; produto: string | null; tipo: string; operacao: string; cancelado: boolean | null
   antes: number | null; depois: number | null; quantidade: number | null; iddocumento: number | null; documento: string | null
-  idusuario: number | null; usuario: string | null; idpessoa: number | null; pessoa: string | null; valor: number | null; vendedora: string | null
+  idusuario: number | null; usuario: string | null; idpessoa: number | null; pessoa: string | null; valor: number | null; vendedora: string | null; registros: number | null
 }
 export type RespLog = { linhas: Mov[]; total: number }
 
@@ -47,7 +47,7 @@ export function celulas(m: Mov, comProduto: boolean) {
     produto: comProduto ? <ItemLink id={m.idmercadoriavariacao}>{m.produto ?? `Item ${m.idmercadoriavariacao}`}</ItemLink> : null,
     movimento: preco
       ? <><b>{brl(m.depois)}</b><small>preço antes {brl(m.antes)}</small></>
-      : <><b className={m.quantidade !== null && m.quantidade < 0 ? 'down' : 'up'}>{sinal(m.quantidade)} un.</b><small>saldo {dec(m.antes)} → {dec(m.depois)}</small></>,
+      : <><b className={m.quantidade !== null && m.quantidade < 0 ? 'down' : 'up'}>{sinal(m.quantidade)} un.</b><small>saldo {dec(m.antes)} → {dec(m.depois)}</small>{(m.registros ?? 1) > 1 && <small title="O ERP grava um registro por bipe ou alteração; aqui eles aparecem somados.">{m.registros} lançamentos no ERP</small>}</>,
     valor: m.valor !== null ? brl(m.valor) : <span className="muted">—</span>,
     quem: m.usuario ? <>{m.usuario}{m.vendedora && m.vendedora !== m.usuario && <small>vendedora: {m.vendedora}</small>}</> : <span className="muted">{preco ? 'não informado pelo ERP' : '—'}</span>,
   }
@@ -72,7 +72,7 @@ export function LogItem({ variacao }: { variacao: number }) {
   if (!linhas.length) return <Empty>Nenhuma movimentação registrada para este item.</Empty>
   return (
     <>
-      <p className="hint">Cada mudança de saldo e de preço do item, da mais recente para a mais antiga: quem lançou no ERP, quando, o documento e o saldo antes e depois.</p>
+      <p className="hint">Cada mudança de saldo e de preço do item, da mais recente para a mais antiga: quem lançou no ERP, quando, o documento e o saldo antes e depois. Quando o ERP registra um item várias vezes no mesmo documento (cada unidade bipada, por exemplo), aparece uma linha só com o total.</p>
       <div className="table-wrap cards-sm"><table>
         <caption className="sr-only">Log de modificações do item</caption>
         <thead><tr><th>Quando</th><th>Operação</th><th className="r">Movimento</th><th className="r">Valor</th><th>Quem lançou</th></tr></thead>
