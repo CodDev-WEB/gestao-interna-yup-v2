@@ -293,10 +293,10 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       try {
         if (path === 'vendedoras') {
           const e = q.get('empresa'), empresa = e && /^\d{1,6}$/.test(e) ? Number(e) : null
-          try { return { de, ate, empresa, ...(await db.rpc<Record<string, unknown>>('vendedoras_resumo', { p_de: de, p_ate: ate, p_empresa: empresa })) } }
+          try { return { de, ate, empresa, ...(await db.rpc<Record<string, unknown>>('vendedoras_painel', { p_de: de, p_ate: ate, p_empresa: empresa })) } }
           catch (e) {
             // Banco ainda com a versão anterior da função (sem filtro de loja): mostra o que ela tem.
-            if (!(e instanceof SupabaseError && /PGRST202|vendedoras_resumo/.test(e.message))) throw e
+            if (!(e instanceof SupabaseError && /PGRST202|vendedoras_painel/.test(e.message))) throw e
             const lista = await db.rpc<{ vendas: number; liquido: number; devolvido: number; devolucoes: number }[]>('vendedoras_resumo', { p_de: de, p_ate: ate })
             const s = (f: (x: typeof lista[number]) => number) => lista.reduce((a, x) => a + Math.round(Number(f(x)) * 100), 0) / 100
             const porVend = lista.reduce((a, x) => a + Number(x.vendas), 0)

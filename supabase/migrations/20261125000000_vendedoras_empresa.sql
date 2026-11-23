@@ -1,10 +1,8 @@
 -- Vendedoras: filtro por empresa (loja) e total de vendas sem contar duas vezes a venda com itens de duas
 -- vendedoras. Também devolve o "faturamento" no critério do Gestão à Vista (líquido − devoluções).
--- Idempotente.
+-- Função nova (vendedoras_painel); a vendedoras_resumo anterior continua existindo. Idempotente.
 
-drop function if exists public.vendedoras_resumo(date, date);
-
-create or replace function public.vendedoras_resumo(p_de date, p_ate date, p_empresa integer default null) returns jsonb
+create or replace function public.vendedoras_painel(p_de date, p_ate date, p_empresa integer default null) returns jsonb
 language sql stable security definer set search_path = public, pg_catalog as $$
   with equipe as (select distinct idpessoafuncionario as id from public.vw_venda_item where idpessoafuncionario is not null),
   base as (select * from public.vw_venda_item where data between p_de and p_ate and (p_empresa is null or idempresa = p_empresa)),
@@ -62,7 +60,7 @@ language sql stable security definer set search_path = public, pg_catalog as $$
 $$;
 
 do $$
-declare f text := 'public.vendedoras_resumo(date, date, integer)';
+declare f text := 'public.vendedoras_painel(date, date, integer)';
 begin
   execute format('revoke execute on function %s from public', f);
   if exists (select 1 from pg_roles where rolname = 'anon') then execute format('revoke execute on function %s from anon', f); end if;

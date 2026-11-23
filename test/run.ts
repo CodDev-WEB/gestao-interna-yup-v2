@@ -422,11 +422,11 @@ await test('auditoria ERP × sistema: tudo bate; um centavo a mais no sistema ap
   } finally { await sb.exec(`update erp_documento_mercadoria set valtotalliquido = valtotalliquido - 0.01 where _iddocumento = 10 and _idsequencia = 1`) }
   const ini = day(-120), fim = day(0)
   const total = await one<{ s: string }>(`select coalesce(sum(valtotalliquido), 0)::text as s from vw_venda_item where data between '${ini}' and '${fim}'`)
-  const resumo = (await sb.query<{ r: { vendedoras: { liquido: string }[]; totais: { vendas: number; liquido: string } } }>(`select vendedoras_resumo('${ini}', '${fim}') as r`)).rows[0].r
+  const resumo = (await sb.query<{ r: { vendedoras: { liquido: string }[]; totais: { vendas: number; liquido: string } } }>(`select vendedoras_painel('${ini}', '${fim}') as r`)).rows[0].r
   const vend = resumo.vendedoras
   assert.equal(unidades(resumo.totais.liquido, 2), unidades(total.s, 2))
   assert.equal(Number(resumo.totais.vendas), await count(sb, `select count(distinct iddocumento) as n from vw_venda_item where data between '${ini}' and '${fim}'`))
-  const loja1 = (await sb.query<{ r: { totais: { liquido: string } } }>(`select vendedoras_resumo('${ini}', '${fim}', 1) as r`)).rows[0].r
+  const loja1 = (await sb.query<{ r: { totais: { liquido: string } } }>(`select vendedoras_painel('${ini}', '${fim}', 1) as r`)).rows[0].r
   assert.equal(unidades(loja1.totais.liquido, 2), unidades((await one<{ s: string }>(`select coalesce(sum(valtotalliquido), 0)::text as s from vw_venda_item where idempresa = 1 and data between '${ini}' and '${fim}'`)).s, 2))
   assert.equal(vend.reduce((x, v) => x + unidades(v.liquido, 2), 0n), unidades(total.s, 2), 'soma das vendedoras = total vendido')
   const det = (await sb.query<{ r: { vendidos: unknown[]; meses: unknown[] } }>(`select vendedora_detalhe(0, '${ini}', '${fim}') as r`)).rows[0].r
