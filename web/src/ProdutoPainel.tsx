@@ -9,7 +9,6 @@ import {
   History, PackagePlus, PencilLine, Receipt, RotateCcw, ShoppingCart, Tag, TrendingUp, Undo2, X,
 } from 'lucide-react'
 import { useApi } from './api'
-import { useCodigo } from './codigos'
 import { brl, data as fmtData, dec, int, mes, pct } from './format'
 import { situacao } from './labels'
 import { Empty, ErrorState, Loading, Metric, Tabs } from './ui'
@@ -51,8 +50,8 @@ export function useAbrirItem() {
 /** Nome do produto clicável que abre a ficha. */
 export function ItemLink({ id, children }: { id: number | string; children: ReactNode }) {
   const abrir = useAbrirItem()
-  const codigo = useCodigo(id)
-  return <button type="button" className="item-link" onClick={() => abrir(id)} title={codigo ? `Código ${codigo} no ERP. Abrir ficha do item` : 'Abrir ficha do item'}>{codigo !== null && <span className="cod">{codigo}</span>}{children}</button>
+  // Código do produto no ERP (o mesmo usado na busca de lá) = código da variação.
+  return <button type="button" className="item-link" onClick={() => abrir(id)} title={`Código ${id} no ERP. Abrir ficha do item`}><span className="cod">{id}</span>{children}</button>
 }
 
 const dataHora = (v: string | null | undefined) => {
@@ -373,7 +372,7 @@ export default function ProdutoPainel() {
       <aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="ficha-titulo">
         <header className="drawer-head">
           <div>
-            <span className="eyebrow">Ficha do item{atual?.item.idmercadoria ? ` · código interno ${atual.item.idmercadoria}` : ''} · variação {valido}</span>
+            <span className="eyebrow">Ficha do item · código {valido}{atual?.item.referencia && atual.item.referencia !== valido ? ` · referência ${atual.item.referencia}` : ''}</span>
             <h2 id="ficha-titulo">{atual?.item.descricao ?? 'Carregando…'}</h2>
             {atual && <p className="drawer-sub">
               {atual.item.codigobarras && <button type="button" className="copy" onClick={() => navigator.clipboard?.writeText(atual.item.codigobarras!)} title="Copiar código de barras"><Copy size={13} aria-hidden />{atual.item.codigobarras}</button>}
