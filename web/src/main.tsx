@@ -6,6 +6,7 @@ import './styles.css'
 import { currentUser, logout, onAuthChange } from './api'
 import { Brand } from './ui'
 import ProdutoPainel from './ProdutoPainel'
+import ClientePainel from './ClientePainel'
 import Login from './pages/Login'
 import Resumo from './pages/Resumo'
 import Mes from './pages/Mes'
@@ -102,6 +103,7 @@ function App() {
         </Routes>
       </main>
       <ProdutoPainel />
+      <ClientePainel />
     </div>
   )
 }

@@ -3,6 +3,7 @@
 
 import { SupabaseError, type Supabase } from './supabase/client'
 import { produtoDetalhe } from './produto'
+import { clienteDetalhe, vendasCarregadasAte } from './cliente'
 
 export class DashError extends Error {}
 
@@ -219,8 +220,28 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
     case 'clientes': {
       const limit = int(q.get('limit'), 50, 1, 200), offset = int(q.get('offset'), 0, 0, 1_000_000)
       const seg = pick(q.get('segmento'), SEGMENTOS), s = busca(q.get('busca'))
-      const filtro = (seg ? `&segmento=eq.${seg}` : '') + (s ? ilike('nome', s) : '')
+      // Filtros: recompra atrasada, tempo desde a última compra, valor total e número de compras mínimos.
+      const ultima = pick(q.get('ultima'), ['30', '90', '180', '180+'])
+      const faixa = ultima === '30' ? '&recencia_dias=lte.30' : ultima === '90' ? '&recencia_dias=gt.30&recencia_dias=lte.90'
+        : ultima === '180' ? '&recencia_dias=gt.90&recencia_dias=lte.180' : ultima === '180+' ? '&recencia_dias=gt.180' : ''
+      const minValor = int(q.get('min_valor'), 0, 0, 10_000_000), minCompras = int(q.get('min_compras'), 0, 0, 100_000)
+      const recompra = pick(q.get('recompra'), ['atrasada', 'em_dia'])
+      // Folga de 3 dias: quem compra quase todo dia não conta como atrasado por um dia de diferença.
+      const ref = recompra ? (await vendasCarregadasAte(db)).ate : null
+      const limite = ref ? new Date(Date.parse(ref + 'T00:00:00Z') - 3 * 86_400_000).toISOString().slice(0, 10) : null
+      const filtro = (seg ? `&segmento=eq.${seg}` : '') + (s ? ilike('nome', s) : '') + faixa
+        + (minValor ? `&valor_total=gte.${minValor}` : '') + (minCompras ? `&compras=gte.${minCompras}` : '')
+        + (recompra === 'atrasada' ? `&proxima_compra_prevista=lt.${limite}&recencia_dias=lte.180` : recompra === 'em_dia' ? `&proxima_compra_prevista=gte.${limite}` : '')
       return db.selectPage('vw_cliente_rfm', `select=*${filtro}${order(q.get('ordem'), ['valor_total', 'compras', 'recencia_dias', 'ticket_medio', 'ultima_compra', 'proxima_compra_prevista'], 'valor_total', q.get('dir'))}`, limit, offset)
+    }
+
+    // Ficha do cliente (painel que abre ao clicar no nome).
+    case 'cliente': {
+      const id = q.get('id')
+      if (!id || !/^\d{1,12}$/.test(id)) throw new DashError('Informe o id do cliente.')
+      const r = await clienteDetalhe(Number(id), db)
+      if (!r) throw new DashError('Cliente não encontrado.')
+      return r
     }
 
     case 'clientes-segmentos': {
