@@ -179,7 +179,7 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       const sit = pick(q.get('situacao'), SITUACOES), setor = pick(q.get('setor'), [...SETORES, 'Não classificado']), s = busca(q.get('busca'))
       const ncm = q.get('ncm')
       const filtroNcm = ncm === 'sem' ? '&ncm=is.null' : ncm && /^\d{2,8}$/.test(ncm) ? `&ncm=like.${ncm}*` : ''
-      const filtro = (sit ? `&situacao=eq.${sit}` : '') + (setor ? `&setor=eq.${encodeURIComponent(setor)}` : '') + (s ? ilike('descricao', s) : '') + filtroNcm
+      const filtro = (sit ? `&situacao=eq.${sit}` : '') + (setor ? `&setor=eq.${encodeURIComponent(setor)}` : '') + (s ? (/^\d{1,14}$/.test(s) ? `&or=(idmercadoria.eq.${s.length <= 9 ? s : -1},codigobarras.eq.${s})` : ilike('descricao', s)) : '') + filtroNcm
       const cols = ['valor_estoque', 'estoque_atual', 'dias_sem_venda', 'qtd_90d', 'faturamento_90d', 'lucro_90d', 'margem_90d_pct', 'cobertura_dias', 'descricao', 'ultima_venda']
       const consulta = `select=*${filtro}${order(q.get('ordem'), cols, 'valor_estoque', q.get('dir'))}`
       // Sem a migração do NCM instalada, cai para a view antiga (o filtro por NCM exige a nova).
@@ -310,6 +310,12 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
         if (e instanceof SupabaseError && (e.status === 404 || /vendedora|PGRST202/.test(e.message))) throw new DashError('O painel de vendedoras ainda não foi instalado no banco (migração 20261124000000_auditoria_vendedoras.sql).')
         throw e
       }
+    }
+
+    // Código interno do ERP (idmercadoria) de cada variação, para mostrar na frente do nome. Lista compacta [variação, código, ...].
+    case 'codigos': {
+      const rows = await db.selectAll<{ _idmercadoriavariacao: number; idmercadoria: number | null }>('erp_mercadoria_variacao', 'select=_idmercadoriavariacao,idmercadoria&order=_idmercadoriavariacao.asc')
+      return rows.flatMap(r => r.idmercadoria === null ? [] : [Number(r._idmercadoriavariacao), Number(r.idmercadoria)])
     }
 
     case 'meses':

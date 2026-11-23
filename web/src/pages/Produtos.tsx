@@ -55,7 +55,7 @@ function Lista() {
           <option value="">Todos os setores</option>
           {[...SETORES, 'Não classificado'].map(x => <option key={x}>{x}</option>)}
         </select>
-        <SearchBox value={busca} onChange={setBusca} placeholder="Buscar produto" />
+        <SearchBox value={busca} onChange={setBusca} placeholder="Nome, código interno ou código de barras" />
         {ncm && <button className="chip" aria-pressed onClick={() => setNcm('')} aria-label="Remover filtro de NCM">{ncm === 'sem' ? 'Sem NCM' : `NCM ${ncm}…`} ✕</button>}
       </div>
       {s && <p className="hint"><strong>{s.nome}:</strong> {s.desc}.</p>}
