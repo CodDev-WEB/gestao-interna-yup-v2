@@ -367,9 +367,11 @@ export default {
       })().catch(e => console.error('descoberta falhou', e)))
       return
     }
-    // Uma vez por dia, às 6h de Belém (9h UTC): auditoria de valores no lugar da sincronização desta rodada.
+    // Uma vez por dia, às 6h de Belém (9h UTC), e logo na primeira rodada depois de instalada: auditoria de
+    // valores no lugar da sincronização desta rodada.
     const quando = new Date(controller.scheduledTime)
-    if (quando.getUTCHours() === 9 && quando.getUTCMinutes() < 5) {
+    const nuncaAuditou = (await db.count('sync_runs', 'dataset=eq.auditoria').catch(() => 1)) === 0
+    if (nuncaAuditou || (quando.getUTCHours() === 9 && quando.getUTCMinutes() < 5)) {
       ctx.waitUntil(auditarEGravar(new ErpClient(env), db).catch(e => console.error('auditoria falhou', e)))
       return
     }
