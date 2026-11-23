@@ -338,6 +338,21 @@ alter table public.erp_inventario_mercadoria add column if not exists dtvalidade
 alter table public.erp_inventario_mercadoria enable row level security;
 create index if not exists erp_inventario_mercadoria_seen_idx on public.erp_inventario_mercadoria (sync_seen_at);
 
+create table if not exists public.erp_documento_auditoria (
+  _iddocumento bigint not null,
+  _idsequenciaauditoria bigint not null,
+  sync_seen_at timestamptz not null default now(),
+  sync_deleted_at timestamptz,
+  primary key (_iddocumento, _idsequenciaauditoria)
+);
+alter table public.erp_documento_auditoria add column if not exists datahora timestamptz;
+alter table public.erp_documento_auditoria add column if not exists idusuario bigint;
+alter table public.erp_documento_auditoria add column if not exists nomeusuario text;
+alter table public.erp_documento_auditoria add column if not exists origem text;
+alter table public.erp_documento_auditoria add column if not exists descricao text;
+alter table public.erp_documento_auditoria enable row level security;
+create index if not exists erp_documento_auditoria_seen_idx on public.erp_documento_auditoria (sync_seen_at);
+
 create table if not exists public.erp_documento_cancelamento_historico (
   _iddocumento bigint not null,
   sync_seen_at timestamptz not null default now(),

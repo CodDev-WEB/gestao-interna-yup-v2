@@ -63,6 +63,8 @@ const C = {
   documento: cols('_iddocumento, idempresa, idpessoa, idusuario, datahora, datahoramovimento, numero, serie, modelo, tipomovimento, tipomovimentoestoque, tipomovimentofinanceiro, idnaturezaoperacao, status'),
   documento_mercadoria: cols('_iddocumento, _idsequencia, idmercadoria, idmercadoriavariacao, descricao, qtd, qtdfator, qtdestoque, qtddevolucao, valunitarioliquido, valtotalbruto, valtotalliquido, valdesconto, valacrescimo, valdescontocashback, idsecao, idgrupo, idsubgrupo, idmarca, idlocalestoque, idpessoafuncionario, lote, dtvalidade, flagbonificacao, iddocumentoorigem'),
   documento_mercadoria_custo: cols('_iddocumento, _idsequencia, idmercadoriavariacao, valcusto, valcustomedio, valfrete, valipi, valicmsst, valoutroscustos'),
+  // Auditoria do ERP: quem fez cada ação no documento (o nome de login do usuário vem daqui).
+  documento_auditoria: cols('_iddocumento, _idsequenciaauditoria, datahora, idusuario, nomeusuario, origem, descricao'),
   documento_cancelamento_historico: cols('_iddocumento, datahora, motivo'),
   mercadoria: cols('_idmercadoria, descricao, referencia, idtipo, idsecao, idgrupo, idsubgrupo, dtalteracao, ncm, cest'),
   mercadoria_variacao: cols('_idmercadoriavariacao, idmercadoria, descricao, referencia, codigobarras, embalagem, marca, idmarca, dtalteracao, ncm, cest'),
@@ -131,6 +133,7 @@ export const DATASETS: Dataset[] = [
   ds('documento_recente', 'documento', 'recent', 720, 'Relê documentos dos últimos dias (status e cancelamentos)', from => `t.datahora >= ${from}`, `t.idempresa = ${EMPRESA_YUP}`),
   ds('documento_mercadoria_recente', 'documento_mercadoria', 'recent', 720, 'Relê itens dos documentos dos últimos dias', docWindow),
   ds('documento_mercadoria_custo_recente', 'documento_mercadoria_custo', 'recent', 720, 'Relê custos dos itens dos últimos dias', docWindow),
+  ds('documento_auditoria', 'documento_auditoria', 'append', 30, 'Auditoria do ERP: quem fez cada ação nos documentos', undefined, SO_YUP_DOC),
   ds('documento_cancelamento_historico', 'documento_cancelamento_historico', 'append', 15, 'Cancelamentos de documentos', undefined, SO_YUP_DOC),
   ds('mercadoria_tabela_preco_historico', 'mercadoria_tabela_preco_historico', 'append', 60, 'Histórico de alterações de preço', undefined, SO_YUP),
   ds('mercadoria_estoque_historico', 'mercadoria_estoque_historico', 'append', 30, 'Histórico de saldos (linha do tempo do estoque)', undefined, SO_YUP_DOC),

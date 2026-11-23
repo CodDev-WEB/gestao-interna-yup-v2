@@ -10,6 +10,27 @@ create index if not exists erp_mercadoria_estoque_historico_ix2 on public.erp_me
 create index if not exists erp_mercadoria_tabela_preco_historico_ix2 on public.erp_mercadoria_tabela_preco_historico (datahora);
 create index if not exists erp_documento_ix4 on public.erp_documento (idusuario);
 
+-- Nome de cada usuário do ERP: o funcionário ligado a ele; se não houver, o nome de login gravado pelo próprio
+-- ERP na auditoria de documentos ou no histórico de preços.
+create or replace view public.vw_usuario_nome with (security_invoker = true) as
+with f as (
+  select distinct on (f.idusuario) f.idusuario, nullif(trim(concat_ws(' ', p.nome, p.sobrenome)), '') as nome
+    from public.erp_pessoa_funcionario f join public.erp_pessoa p on p._idpessoa = f._idpessoa
+   where f.idusuario is not null and f.idusuario <> 0 and f.sync_deleted_at is null
+   order by f.idusuario, (f._idempresa = 1) desc, f.flaginativo nulls last),
+a as (
+  select distinct on (idusuario) idusuario, nullif(trim(nomeusuario), '') as nome
+    from public.erp_documento_auditoria
+   where idusuario is not null and nullif(trim(nomeusuario), '') is not null
+   order by idusuario, datahora desc),
+pr as (
+  select distinct on (idusuarioalteracao) idusuarioalteracao as idusuario, nullif(trim(nomeusuarioalteracao), '') as nome
+    from public.erp_mercadoria_tabela_preco_historico
+   where idusuarioalteracao is not null and nullif(trim(nomeusuarioalteracao), '') is not null
+   order by idusuarioalteracao, datahora desc)
+select idusuario, coalesce(f.nome, a.nome, pr.nome) as nome, coalesce(a.nome, pr.nome) as login
+  from f full join a using (idusuario) full join pr using (idusuario);
+
 create or replace view public.vw_log_movimento with (security_invoker = true) as
 select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
        'estoque'::text as origem,
@@ -39,7 +60,7 @@ select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
        d._iddocumento as iddocumento,
        nullif(trim(concat_ws(' ', d.modelo, d.numero)), '') as documento,
        d.idusuario,
-       coalesce(nullif(trim(concat_ws(' ', pu.nome, pu.sobrenome)), ''), case when d.idusuario is not null then 'Usuário nº ' || d.idusuario end) as usuario,
+       coalesce(un.nome, case when d.idusuario is not null then 'Usuário nº ' || d.idusuario end) as usuario,
        d.idpessoa,
        nullif(trim(concat_ws(' ', pp.nome, pp.sobrenome)), '') as pessoa,
        it.valor,
@@ -54,11 +75,8 @@ select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
          group by x._iddocumento, x._idlocalestoque, x.idmercadoriavariacao) h
   left join public.erp_documento d on d._iddocumento = h._iddocumento
   left join public.erp_natureza_operacao n on n._idnatureza = d.idnaturezaoperacao and n._idempresa = d.idempresa
-  -- documento.idusuario é o usuário do ERP; o nome vem do funcionário ligado a ele (pessoa_funcionario).
-  left join lateral (
-    select p2.nome, p2.sobrenome from public.erp_pessoa_funcionario f join public.erp_pessoa p2 on p2._idpessoa = f._idpessoa
-     where f.idusuario = d.idusuario and f.idusuario <> 0 and f.sync_deleted_at is null
-     order by (f._idempresa = d.idempresa) desc, f.flaginativo nulls last limit 1) pu on true
+  -- documento.idusuario é o usuário do ERP (não a pessoa): nome pelo funcionário ligado ou pelo login.
+  left join public.vw_usuario_nome un on un.idusuario = d.idusuario
   left join public.erp_pessoa pp on pp._idpessoa = d.idpessoa
   left join lateral (
     select sum(dm.valtotalliquido) as valor,
@@ -71,7 +89,7 @@ select 'p' || t._idhistorico || '-' || t._idtabela,
        'preco', t.datahora, t._idmercadoriavariacao, null, 'preco',
        'Mudança de preço de venda' || case when t._idtabela <> 1 then ' (tabela ' || t._idtabela || ')' else '' end,
        false, t.valprecotual, t.valpreconovo, t.valpreconovo - t.valprecotual,
-       null, null, t.idusuarioalteracao, nullif(trim(t.nomeusuarioalteracao), ''), null, null, null, null, 1::bigint
+       null, null, t.idusuarioalteracao, coalesce((select un2.nome from public.vw_usuario_nome un2 where un2.idusuario = t.idusuarioalteracao), nullif(trim(t.nomeusuarioalteracao), '')), null, null, null, null, 1::bigint
   from public.erp_mercadoria_tabela_preco_historico t;
 
 create or replace function public.log_movimentos(p jsonb) returns jsonb
@@ -117,7 +135,7 @@ select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
        d._iddocumento as iddocumento,
        nullif(trim(concat_ws(' ', d.modelo, d.numero)), '') as documento,
        d.idusuario,
-       coalesce(nullif(trim(concat_ws(' ', pu.nome, pu.sobrenome)), ''), case when d.idusuario is not null then 'Usuário nº ' || d.idusuario end) as usuario,
+       coalesce(un.nome, case when d.idusuario is not null then 'Usuário nº ' || d.idusuario end) as usuario,
        d.idpessoa,
        nullif(trim(concat_ws(' ', pp.nome, pp.sobrenome)), '') as pessoa,
        it.valor,
@@ -133,11 +151,8 @@ select 'e' || h.idh || '-' || h._iddocumento || '-' || h._idlocalestoque as id,
          group by x._iddocumento, x._idlocalestoque, x.idmercadoriavariacao) h
   left join public.erp_documento d on d._iddocumento = h._iddocumento
   left join public.erp_natureza_operacao n on n._idnatureza = d.idnaturezaoperacao and n._idempresa = d.idempresa
-  -- documento.idusuario é o usuário do ERP; o nome vem do funcionário ligado a ele (pessoa_funcionario).
-  left join lateral (
-    select p2.nome, p2.sobrenome from public.erp_pessoa_funcionario f join public.erp_pessoa p2 on p2._idpessoa = f._idpessoa
-     where f.idusuario = d.idusuario and f.idusuario <> 0 and f.sync_deleted_at is null
-     order by (f._idempresa = d.idempresa) desc, f.flaginativo nulls last limit 1) pu on true
+  -- documento.idusuario é o usuário do ERP (não a pessoa): nome pelo funcionário ligado ou pelo login.
+  left join public.vw_usuario_nome un on un.idusuario = d.idusuario
   left join public.erp_pessoa pp on pp._idpessoa = d.idpessoa
   left join lateral (
     select sum(dm.valtotalliquido) as valor,
@@ -150,7 +165,7 @@ select 'p' || t._idhistorico || '-' || t._idtabela,
        'preco', t.datahora, t._idmercadoriavariacao, null, 'preco',
        'Mudança de preço de venda' || case when t._idtabela <> 1 then ' (tabela ' || t._idtabela || ')' else '' end,
        false, t.valprecotual, t.valpreconovo, t.valpreconovo - t.valprecotual,
-       null, null, t.idusuarioalteracao, nullif(trim(t.nomeusuarioalteracao), ''), null, null, null, null, 1::bigint
+       null, null, t.idusuarioalteracao, coalesce((select un2.nome from public.vw_usuario_nome un2 where un2.idusuario = t.idusuarioalteracao), nullif(trim(t.nomeusuarioalteracao), '')), null, null, null, null, 1::bigint
   from public.erp_mercadoria_tabela_preco_historico t
  where (v is null or t._idmercadoriavariacao = v) and t.datahora >= de and t.datahora < ate),
   f as (
@@ -171,10 +186,9 @@ end $$;
 create or replace function public.log_usuarios() returns jsonb
 language sql stable security definer set search_path = public, pg_catalog as $$
   select coalesce(jsonb_agg(jsonb_build_object('id', u.id, 'nome', u.nome, 'movimentos', u.n) order by u.n desc), '[]'::jsonb)
-    from (select d.idusuario as id, coalesce(max(nullif(trim(concat_ws(' ', p.nome, p.sobrenome)), '')), 'Usuário nº ' || d.idusuario) as nome, count(distinct d._iddocumento) as n
+    from (select d.idusuario as id, coalesce(max(un.nome), 'Usuário nº ' || d.idusuario) as nome, count(*) as n
             from public.erp_documento d
-            left join public.erp_pessoa_funcionario f on f.idusuario = d.idusuario and f.idusuario <> 0 and f.sync_deleted_at is null
-            left join public.erp_pessoa p on p._idpessoa = f._idpessoa
+            left join public.vw_usuario_nome un on un.idusuario = d.idusuario
            where d.idusuario is not null group by d.idusuario) u
 $$;
 
