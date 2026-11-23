@@ -53,3 +53,17 @@ export async function descobrirUsuarios(erp: ErpClient) {
   }
   return resultados
 }
+
+/** Colunas dos históricos (preço e estoque) e a tabela de usuários, para saber se o ERP guarda quem alterou. */
+export async function descobrirAutoria(erp: ErpClient) {
+  const r: Record<string, unknown> = {}
+  const tentar = async (nome: string, sql: string, limite = 100) => {
+    try { assertReadOnly(sql); r[nome] = (await erp.page(sql, 0, limite)).rows.slice(0, limite) }
+    catch (e) { r[nome] = { erro: String(e instanceof Error ? e.message : e).slice(0, 200) } }
+  }
+  await tentar('colunas_historicos', "SELECT table_name, column_name FROM information_schema.columns WHERE table_name IN ('mercadoria_tabela_preco_historico', 'mercadoria_estoque_historico', 'mercadoria_tabela_preco', 'mercadoria_custo', 'mercadoria_historico', 'log', 'auditoria') ORDER BY table_name, column_name")
+  await tentar('tabelas_log', "SELECT DISTINCT table_name FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND (table_name ILIKE '%log%' OR table_name ILIKE '%auditoria%' OR table_name ILIKE '%historico%') ORDER BY table_name")
+  await tentar('usuario', 'SELECT t._idusuario, t.nome FROM usuario t', 60)
+  await tentar('usuario_login', 'SELECT t._idusuario, t.login FROM usuario t', 60)
+  return r
+}
