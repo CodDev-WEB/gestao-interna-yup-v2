@@ -291,7 +291,18 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       const ate = ISO.test(q.get('ate') ?? '') ? q.get('ate')! : fim
       if (de > ate) throw new DashError('A data inicial é depois da final.')
       try {
-        if (path === 'vendedoras') return { de, ate, vendedoras: await db.rpc('vendedoras_resumo', { p_de: de, p_ate: ate }) }
+        if (path === 'vendedoras') {
+          const e = q.get('empresa'), empresa = e && /^\d{1,6}$/.test(e) ? Number(e) : null
+          try { return { de, ate, empresa, ...(await db.rpc<Record<string, unknown>>('vendedoras_resumo', { p_de: de, p_ate: ate, p_empresa: empresa })) } }
+          catch (e) {
+            // Banco ainda com a versão anterior da função (sem filtro de loja): mostra o que ela tem.
+            if (!(e instanceof SupabaseError && /PGRST202|vendedoras_resumo/.test(e.message))) throw e
+            const lista = await db.rpc<{ vendas: number; liquido: number; devolvido: number; devolucoes: number }[]>('vendedoras_resumo', { p_de: de, p_ate: ate })
+            const s = (f: (x: typeof lista[number]) => number) => lista.reduce((a, x) => a + Math.round(Number(f(x)) * 100), 0) / 100
+            const porVend = lista.reduce((a, x) => a + Number(x.vendas), 0)
+            return { de, ate, empresa: null, vendedoras: lista, empresas: [], totais: { vendas: porVend, vendas_por_vendedora: porVend, vendas_por_vendedora_dia: porVend, liquido: s(x => x.liquido), devolvido: s(x => x.devolvido), devolucoes: s(x => x.devolucoes) } }
+          }
+        }
         const id = int(q.get('id'), -1, 0, 2_000_000_000)
         if (id < 0) throw new DashError('Vendedora inválida.')
         return { de, ate, ...(await db.rpc<Record<string, unknown>>('vendedora_detalhe', { p_id: id, p_de: de, p_ate: ate })) }

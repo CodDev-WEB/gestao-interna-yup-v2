@@ -14,7 +14,11 @@ type V = {
   id: number; nome: string; vendas: number; itens: number; qtd: number; bruto: number; desconto: number; liquido: number; custo: number; lucro: number
   clientes: number; itens_sem_custo: number; devolucoes: number; devolvido: number; compras: number; itens_comprados: number; comprado: number; desconto_recebido: number
 }
-type Resp = { de: string; ate: string; vendedoras: V[] }
+type Resp = {
+  de: string; ate: string; empresa: number | null; vendedoras: V[]
+  totais: { vendas: number; vendas_por_vendedora: number; vendas_por_vendedora_dia: number; liquido: number; devolvido: number; devolucoes: number }
+  empresas: { id: number; vendas: number; liquido: number }[]
+}
 type ItemV = { id: number; descricao: string | null; vendas?: number; compras?: number; qtd: number; bruto: number; desconto: number; liquido: number; custo?: number; lucro?: number }
 type Ficha = {
   de: string; ate: string; id: number; nome: string
@@ -47,12 +51,13 @@ export default function Vendedoras() {
   const p = sp.get('periodo') ?? 'mes'
   const [de0, ate0] = periodo(p)
   const de = sp.get('de') ?? de0, ate = sp.get('ate') ?? ate0
+  const empresa = sp.get('empresa') ?? ''
   const set = (k: Record<string, string | null>) => setSp(prev => { const n = new URLSearchParams(prev); for (const [a, b] of Object.entries(k)) b === null ? n.delete(a) : n.set(a, b); return n }, { replace: true })
-  const { data: r, error, loading, reload } = useApi<Resp>(`dash/vendedoras?de=${de}&ate=${ate}`)
+  const { data: r, error, loading, reload } = useApi<Resp>(`dash/vendedoras?de=${de}&ate=${ate}${empresa ? `&empresa=${empresa}` : ''}`)
   const lista = r?.vendedoras ?? []
   const equipe = lista.filter(v => v.id !== 0)
   const tot = {
-    vendas: soma(lista, v => v.vendas), liquido: soma(lista, v => v.liquido), bruto: soma(lista, v => v.bruto), desconto: soma(lista, v => v.desconto),
+    vendas: r?.totais.vendas ?? 0, liquido: soma(lista, v => v.liquido), bruto: soma(lista, v => v.bruto), desconto: soma(lista, v => v.desconto),
     custo: soma(lista, v => v.custo), lucro: soma(lista, v => v.lucro), devolvido: soma(lista, v => v.devolvido), devolucoes: soma(lista, v => v.devolucoes),
     comprado: soma(lista, v => v.comprado), compras: soma(lista, v => v.compras), itens: soma(lista, v => v.itens),
   }
@@ -65,6 +70,8 @@ export default function Vendedoras() {
       </PageHead>
       <div className="toolbar">
         <Tabs label="Período" value={sp.get('de') ? 'livre' : p} onChange={v => set({ periodo: v, de: null, ate: null })} options={PERIODOS} />
+        {(r?.empresas.length ?? 0) > 1 && <label className="field-inline">Loja <select className="select" value={empresa} onChange={e => set({ empresa: e.target.value || null })}>
+          <option value="">Todas</option>{r!.empresas.map(x => <option key={x.id} value={x.id}>Empresa {x.id} ({int(x.vendas)} vendas)</option>)}</select></label>}
         <label className="field-inline">De <input className="input" type="date" value={de} max={ate} onChange={e => e.target.value && set({ de: e.target.value, ate })} /></label>
         <label className="field-inline">Até <input className="input" type="date" value={ate} min={de} onChange={e => e.target.value && set({ de, ate: e.target.value })} /></label>
       </div>
@@ -76,6 +83,16 @@ export default function Vendedoras() {
             <Metric icon={<Undo2 size={18} />} tone="red" label="Devoluções" value={brl(tot.devolvido)} detail={`${int(tot.devolucoes)} devoluções`} />
             <Metric icon={<ShoppingBag size={18} />} tone="purple" label="Compras da equipe" value={brl(tot.comprado)} detail={`${int(tot.compras)} compras feitas por vendedoras`} />
           </div>
+          <section className="aud-card" style={{ marginBottom: 18 }} aria-label="Comparação com o Gestão à Vista">
+            <h3>Para comparar com o Gestão à Vista</h3>
+            <div className="table-wrap"><table><caption className="sr-only">Mesmos números em cada critério</caption>
+              <thead><tr><th /><th className="r">Este sistema</th><th className="r">Critério do Gestão à Vista</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Faturamento</th><td className="r money">{brl(tot.liquido)}<small>líquido dos itens</small></td><td className="r money">{brl(Math.round((r.totais.liquido - r.totais.devolvido) * 100) / 100)}<small>líquido − devoluções ({brl(r.totais.devolvido)})</small></td></tr>
+                <tr><th scope="row">Vendas</th><td className="r">{int(r.totais.vendas)}<small>cada venda uma vez</small></td><td className="r">{int(r.totais.vendas_por_vendedora_dia)}<small>uma por vendedora em cada venda</small></td></tr>
+              </tbody></table></div>
+            <p className="hint">O Gestão à Vista mostra só a loja dele{empresa ? '' : ' (escolha a loja acima)'}, desconta as devoluções do faturamento e conta a venda feita por duas vendedoras duas vezes. Ele também só mostra vendedoras cadastradas nele e pode estar alguns minutos atrás.</p>
+          </section>
           {!lista.length ? <Empty>Nenhuma venda no período.</Empty> : (
             <div className="table-wrap cards-sm"><table>
               <caption className="sr-only">Vendas por vendedora</caption>
@@ -103,14 +120,14 @@ export default function Vendedoras() {
                 ))}
               </tbody>
               <tfoot><tr>
-                <th>Total ({equipe.length} vendedoras)</th><td className="r">{int(tot.vendas)}</td><td className="r money">{brl(tot.bruto)}</td><td className="r money">{brl(tot.desconto)}</td>
+                <th>Total ({equipe.length} vendedoras)<small>{int(tot.vendas)} vendas diferentes; somando cada vendedora dá {int(r.totais.vendas_por_vendedora)}</small></th><td className="r">{int(tot.vendas)}</td><td className="r money">{brl(tot.bruto)}</td><td className="r money">{brl(tot.desconto)}</td>
                 <td className="r money">{brl(Math.round((tot.liquido - tot.bruto + tot.desconto) * 100) / 100)}</td><td className="r money"><b>{brl(tot.liquido)}</b></td>
                 <td className="r money">{brl(tot.custo)}</td><td className="r money">{brl(tot.lucro)}</td><td className="r">{tot.liquido ? pct(tot.lucro / tot.liquido * 100) : '—'}</td>
                 <td className="r money">{tot.vendas ? brl(Math.round(tot.liquido / tot.vendas * 100) / 100) : '—'}</td><td className="r money">{brl(tot.devolvido)}</td><td className="r money">{brl(tot.comprado)}</td>
               </tr></tfoot>
             </table></div>
           )}
-          <p className="hint">Líquido = bruto − desconto + acréscimo, item a item, como no ERP. Uma venda com itens de duas vendedoras conta para as duas. "Comprou" são vendas em que o cliente é a própria vendedora.</p>
+          <p className="hint">Líquido = bruto − desconto + acréscimo, item a item, como no ERP. Uma venda com itens de duas vendedoras aparece na linha de cada uma, mas no total conta uma vez só. "Comprou" são vendas em que o cliente é a própria vendedora.</p>
         </div>
       )}
       <FichaVendedora de={de} ate={ate} />
