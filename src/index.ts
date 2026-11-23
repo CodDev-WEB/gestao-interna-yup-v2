@@ -238,7 +238,7 @@ export default {
         case 'GET /api/supabase/test': {
           const db = new Supabase(env)
           const [settings] = await db.select('sync_settings', 'id=eq.1&select=auto_enabled,recent_days')
-          const runs = await db.select('sync_runs', 'dataset=not.in.(erp_schema,auditoria,erp_usuarios)&select=id,started_at,status&order=started_at.desc&limit=1')
+          const runs = await db.select('sync_runs', 'dataset=not.in.(erp_schema,auditoria,erp_usuarios,erp_usuarios2)&select=id,started_at,status&order=started_at.desc&limit=1')
           return json({ ok: true, settings: settings ?? null, last_run: runs[0] ?? null })
         }
 
@@ -248,7 +248,7 @@ export default {
           const [settings, states, runs] = await Promise.all([
             db.select('sync_settings', 'id=eq.1&select=auto_enabled,recent_days,updated_at'),
             db.select<{ dataset: string }>('sync_state', 'select=*'),
-            db.select('sync_runs', 'dataset=not.in.(erp_schema,auditoria,erp_usuarios)&select=id,mode,status,started_at,finished_at,rows_written,erp_requests,error&order=started_at.desc&limit=10'),
+            db.select('sync_runs', 'dataset=not.in.(erp_schema,auditoria,erp_usuarios,erp_usuarios2)&select=id,mode,status,started_at,finished_at,rows_written,erp_requests,error&order=started_at.desc&limit=10'),
           ])
           const byName = new Map(states.map(s => [s.dataset, s as { dataset: string; last_error?: string | null }]))
           // Erro de registro: separa a mensagem do detalhe e monta o "o que corrigir" com item, lote e documento.
@@ -266,7 +266,7 @@ export default {
             abertos = pg.rows; totalAvisos = pg.total
           } catch {
             tabelaAvisos = false
-            const det = await db.select<{ details: { jobs?: { avisos_nao_gravados?: AvisoRow[] }[] } | null }>('sync_runs', 'dataset=not.in.(erp_schema,auditoria,erp_usuarios)&select=details&order=started_at.desc&limit=30').catch(() => [])
+            const det = await db.select<{ details: { jobs?: { avisos_nao_gravados?: AvisoRow[] }[] } | null }>('sync_runs', 'dataset=not.in.(erp_schema,auditoria,erp_usuarios,erp_usuarios2)&select=details&order=started_at.desc&limit=30').catch(() => [])
             abertos = [...new Map(det.flatMap(r => (r.details?.jobs ?? []).flatMap(j => j.avisos_nao_gravados ?? [])).map(a => [a.chave, a])).values()].slice(0, 30)
             totalAvisos = abertos.length
           }
@@ -369,11 +369,11 @@ export default {
       return
     }
     // Uma vez: descobre a tabela de usuários do ERP (quem lança os documentos), para o log mostrar o nome certo.
-    if ((await db.count('sync_runs', 'dataset=eq.erp_usuarios').catch(() => 1)) === 0) {
+    if ((await db.count('sync_runs', 'dataset=eq.erp_usuarios2').catch(() => 1)) === 0) {
       ctx.waitUntil((async () => {
         const inicio = new Date().toISOString(), erp = new ErpClient(env)
         const resultados = await descobrirUsuarios(erp)
-        await db.insertMinimal('sync_runs', { dataset: 'erp_usuarios', mode: 'descoberta', status: 'ok', started_at: inicio, finished_at: new Date().toISOString(), rows_read: 0, rows_written: 0, erp_requests: erp.requests, error: null, details: resultados })
+        await db.insertMinimal('sync_runs', { dataset: 'erp_usuarios2', mode: 'descoberta', status: 'ok', started_at: inicio, finished_at: new Date().toISOString(), rows_read: 0, rows_written: 0, erp_requests: erp.requests, error: null, details: resultados })
       })().catch(e => console.error('descoberta de usuários falhou', e)))
       return
     }

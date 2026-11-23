@@ -33,7 +33,7 @@ export async function descobrirColunas(erp: ErpClient) {
  */
 export async function descobrirUsuarios(erp: ErpClient) {
   const resultados: Record<string, unknown> = {}
-  const colunas = await erp.page("SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND (table_name ILIKE '%usuario%' OR table_name ILIKE '%operador%' OR table_name ILIKE '%funcionario%') ORDER BY table_name, column_name", 0, 100)
+  const colunas = await erp.page("SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND (table_name ILIKE 'usuario%' OR table_name ILIKE 'operador%' OR table_name ILIKE 'pessoa_usuario%' OR table_name ILIKE 'funcionario' OR table_name ILIKE 'pessoa_funcionario%') AND table_name NOT ILIKE '%selecao%' ORDER BY table_name, column_name", 0, 100)
     .then(r => r.rows).catch(e => { resultados.erro_colunas = String(e instanceof Error ? e.message : e).slice(0, 300); return [] })
   resultados.colunas = colunas
   const porTabela = new Map<string, string[]>()
