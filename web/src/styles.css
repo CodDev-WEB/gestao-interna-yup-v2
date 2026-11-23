@@ -793,3 +793,5 @@ h1, h2, h3 { text-wrap: balance; }
 .table-wrap td small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
 .table-wrap td.wrap small { white-space: normal; }
 @media (max-width: 760px) { .sheet-head .brand small { display: none; } .table-wrap td small { max-width: none; white-space: normal; } }
+/* Ficha do item sempre por cima das outras fichas (cliente, vendedora). */
+.drawer-root.ficha-item { z-index: 70; }

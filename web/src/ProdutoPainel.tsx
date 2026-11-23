@@ -353,12 +353,12 @@ export default function ProdutoPainel() {
     const antes = document.activeElement as HTMLElement | null
     document.body.style.overflow = 'hidden'
     // Menu e página ficam inertes: o Tab não sai do painel e o leitor de tela só lê a ficha.
-    const fundo = Array.from(document.querySelectorAll<HTMLElement>('.shell > .skip-link, .shell > .sidebar, .shell > .content'))
+    const fundo = Array.from(document.querySelectorAll<HTMLElement>('.shell > .skip-link, .shell > .sidebar, .shell > .content, .shell > .topbar-celular, .shell > .tabbar, .shell > .drawer-root:not(.ficha-item)'))
     fundo.forEach(el => el.setAttribute('inert', ''))
     fechar.current?.focus()
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     window.addEventListener('keydown', onKey)
-    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); fundo.forEach(el => el.removeAttribute('inert')); antes?.focus?.() }
+    return () => { document.body.style.overflow = document.querySelector('.drawer-root') ? 'hidden' : ''; window.removeEventListener('keydown', onKey); fundo.forEach(el => el.removeAttribute('inert')); antes?.focus?.() }
   }, [valido]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!valido) return null
@@ -367,7 +367,7 @@ export default function ProdutoPainel() {
   const lotesAtivos = atual?.lotes.filter(l => l.qtdsaldo > 0).length ?? 0
 
   return (
-    <div className="drawer-root">
+    <div className="drawer-root ficha-item">
       <div className="drawer-backdrop" onClick={close} aria-hidden />
       <aside className="drawer" role="dialog" aria-modal="true" aria-labelledby="ficha-titulo">
         <header className="drawer-head">

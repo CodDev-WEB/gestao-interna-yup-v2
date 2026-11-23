@@ -168,8 +168,9 @@ function App() {
       </main>
       <BarraCelular user={user} />
       <VoltarTopo />
-      <ProdutoPainel />
+      {/* Ordem importa: a ficha do item abre por cima da do cliente (e da vendedora). */}
       <ClientePainel />
+      <ProdutoPainel />
     </div>
   )
 }

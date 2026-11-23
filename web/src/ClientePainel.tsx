@@ -207,9 +207,10 @@ export default function ClientePainel() {
     const antes = document.activeElement as HTMLElement | null
     document.body.style.overflow = 'hidden'
     fechar.current?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    // Com a ficha do item aberta por cima, o Esc fecha só ela.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !new URLSearchParams(window.location.search).has('item')) close() }
     window.addEventListener('keydown', onKey)
-    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey); antes?.focus?.() }
+    return () => { document.body.style.overflow = document.querySelector('.drawer-root') ? 'hidden' : ''; window.removeEventListener('keydown', onKey); antes?.focus?.() }
   }, [valido]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!valido) return null
