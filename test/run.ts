@@ -248,6 +248,7 @@ async function settle(clock: Date, label: string) {
     if (r.message === 'Nada a sincronizar agora.') break
     assert.ok(runs < 200, `${label}: não estabilizou`)
   }
+  await sb.query('select alinhar_espelho()')
   await sb.query('select atualizar_gestao()') // como o cron do Worker faz depois da sincronização
   return { runs, requests: api.requests }
 }
@@ -474,6 +475,33 @@ await test('relatório montado: agrupa, soma ao centavo, filtra e recusa o que n
   await assert.rejects(rel({ fonte: 'vendas', metricas: ['sum(1)'] }), /Métrica inválida/)
   const busca = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['item'], metricas: ['liquido'], filtros: { produto: "a'; select 1 --" } })
   assert.ok(Array.isArray(busca.linhas))
+})
+
+await test('alinhamento: venda que chegou depois da leitura do saldo já baixa o estoque; preço e cancelamento também', async () => {
+  await sb.exec(`insert into erp_mercadoria_estoque (_idempresa, _idlocalestoque, _idmercadoriavariacao, qtdsaldo, datahora) values (1, 1, 778, 10, now() - interval '2 hours')`)
+  await sb.exec(`insert into erp_documento (_iddocumento, idempresa, datahora, tipomovimento, tipomovimentofinanceiro, status, modelo, sync_seen_at) values (9778, 1, now() - interval '1 hour', 'S', 'R', 'E', 'PV', now() - interval '50 minutes')`)
+  await sb.exec(`insert into erp_mercadoria_estoque_historico (_idhistorico, _iddocumento, _idlocalestoque, idmercadoriavariacao, datahora, qtdsaldoatual, qtdnovosaldo) values (99778, 9778, 1, 778, now() - interval '1 hour', 10, 7)`)
+  await sb.exec(`insert into erp_mercadoria_tabela_preco (_idempresa, _idmercadoriavariacao, _idtabela, valpreco, dtalteracao) values (1, 778, 1, 20, now() - interval '1 day')`)
+  await sb.exec(`insert into erp_mercadoria_tabela_preco_historico (_idhistorico, _idempresa, _idmercadoriavariacao, _idtabela, datahora, valprecotual, valpreconovo) values (99778, 1, 778, 1, now() - interval '30 minutes', 20, 22.5)`)
+  await sb.exec(`insert into erp_documento_cancelamento_historico (_iddocumento, datahora, motivo) values (9778, now() - interval '10 minutes', 'TESTE')`)
+  try {
+    const r = (await sb.query<{ r: Record<string, number> }>('select alinhar_espelho() as r')).rows[0].r
+    assert.ok(r.estoque >= 1 && r.precos >= 1 && r.cancelamentos >= 1, JSON.stringify(r))
+    assert.equal(Number((await one<{ q: string }>(`select qtdsaldo::text as q from erp_mercadoria_estoque where _idmercadoriavariacao = 778`)).q), 7)
+    assert.equal(Number((await one<{ q: string }>(`select valpreco::text as q from erp_mercadoria_tabela_preco where _idmercadoriavariacao = 778`)).q), 22.5)
+    assert.equal((await one<{ s: string }>(`select status as s from erp_documento where _iddocumento = 9778`)).s, 'C')
+    // Saldo lido depois do movimento não é sobrescrito por movimento mais antigo.
+    await sb.exec(`update erp_mercadoria_estoque set qtdsaldo = 5, datahora = now() where _idmercadoriavariacao = 778`)
+    await sb.query('select alinhar_espelho()')
+    assert.equal(Number((await one<{ q: string }>(`select qtdsaldo::text as q from erp_mercadoria_estoque where _idmercadoriavariacao = 778`)).q), 5)
+  } finally {
+    await sb.exec(`delete from erp_documento_cancelamento_historico where _iddocumento = 9778`)
+    await sb.exec(`delete from erp_mercadoria_tabela_preco_historico where _idhistorico = 99778`)
+    await sb.exec(`delete from erp_mercadoria_tabela_preco where _idmercadoriavariacao = 778`)
+    await sb.exec(`delete from erp_mercadoria_estoque_historico where _idhistorico = 99778`)
+    await sb.exec(`delete from erp_documento where _iddocumento = 9778`)
+    await sb.exec(`delete from erp_mercadoria_estoque where _idmercadoriavariacao = 778`)
+  }
 })
 
 // ---------- Mudanças no ERP ----------

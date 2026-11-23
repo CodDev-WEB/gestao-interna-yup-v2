@@ -381,6 +381,8 @@ export default {
       runSync({ erp: new ErpClient(env), store: new PostgrestStore(new Supabase(env)) }, syncOptions(env, { trigger: 'cron' }))
         .then(r => { if (r.status === 'error' || r.status === 'partial') console.error('sync', r.status, r.message) })
         .catch(e => console.error('sync falhou', e))
+        // Toda rodada: aplica movimentos de estoque, preços e cancelamentos que chegaram com as vendas.
+        .then(() => db.rpc('alinhar_espelho', {}).catch(e => console.error('alinhar_espelho falhou', e)))
         .then(() => atualizarGestao ? db.rpc('atualizar_gestao', {}).catch(e => console.error('atualizar_gestao falhou', e)) : undefined),
     )
   },
