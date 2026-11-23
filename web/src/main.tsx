@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { BadgeCheck, CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, IdCard, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
+import { BadgeCheck, FileBarChart, CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, IdCard, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
 import './styles.css'
 import { currentUser, logout, onAuthChange } from './api'
 import { Brand } from './ui'
@@ -23,6 +23,7 @@ import Conciliacao from './pages/Conciliacao'
 import Qualidade from './pages/Qualidade'
 import Vendedoras from './pages/Vendedoras'
 import Auditoria from './pages/Auditoria'
+import Relatorios from './pages/Relatorios'
 
 const NAV = [
   { to: '/', label: 'Visão geral', icon: LayoutDashboard, end: true },
@@ -35,6 +36,7 @@ const NAV = [
   { to: '/clientes', label: 'Clientes', icon: Users },
   { to: '/vendedoras', label: 'Vendedoras', icon: IdCard },
   { to: '/setores', label: 'Setores', icon: Shapes, filhos: SUBABAS_SETORES },
+  { to: '/relatorios', label: 'Relatórios', icon: FileBarChart },
   { to: '/auditoria', label: 'Auditoria de valores', icon: BadgeCheck },
   { to: '/qualidade', label: 'Qualidade do dado', icon: ShieldAlert },
   { to: '/sincronizacao', label: 'Sincronização', icon: RefreshCw },
@@ -96,6 +98,7 @@ function App() {
           <Route path="/qualidade" element={<Qualidade />} />
           <Route path="/vendedoras" element={<Vendedoras />} />
           <Route path="/auditoria" element={<Auditoria />} />
+          <Route path="/relatorios" element={<Relatorios />} />
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/validades" element={<Validades />} />
           <Route path="/fornecedores" element={<Fornecedores />} />

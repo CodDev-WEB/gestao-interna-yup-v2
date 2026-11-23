@@ -452,6 +452,26 @@ await test('validade pelo disponível: estoque repartido entre os lotes, o que v
   }
 })
 
+await test('relatório montado: agrupa, soma ao centavo, filtra e recusa o que não está na lista', async () => {
+  const rel = async (p: Record<string, unknown>) => (await sb.query<{ r: any }>('select relatorio($1) as r', [JSON.stringify(p)])).rows[0].r
+  const ini = day(-120), fim = day(0)
+  const total = await one<{ s: string; n: string }>(`select coalesce(sum(valtotalliquido), 0)::text as s, count(distinct iddocumento)::text as n from vw_venda_item where data between '${ini}' and '${fim}'`)
+  const porMes = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['mes'], metricas: ['liquido', 'documentos', 'margem'] })
+  assert.equal(porMes.linhas.reduce((a: bigint, l: any) => a + unidades(l.liquido, 2), 0n), unidades(total.s, 2), 'soma das linhas = total')
+  assert.equal(unidades(porMes.totais.liquido, 2), unidades(total.s, 2))
+  assert.equal(Number(porMes.totais.documentos), Number(total.n))
+  assert.ok(porMes.linhas.every((l: any, i: number, a: any[]) => i === 0 || a[i - 1].mes <= l.mes), 'meses em ordem')
+  const itens = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['item'], metricas: ['qtd', 'liquido'], limite: 2 })
+  assert.ok(itens.linhas.length <= 2 && 'produto' in itens.linhas[0] && 'codigo' in itens.linhas[0])
+  const filtrado = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['empresa'], metricas: ['liquido'], filtros: { empresa: 2 } })
+  assert.ok(filtrado.linhas.every((l: any) => Number(l.empresa) === 2))
+  for (const fonte of ['compras', 'devolucoes', 'estoque', 'validades']) await rel({ fonte, de: day(-400), ate: day(400), grupos: ['setor'], metricas: ['qtd', 'custo'] })
+  await assert.rejects(rel({ fonte: 'vendas', grupos: ['x; drop table erp_documento'], metricas: ['liquido'] }), /Agrupamento inválido/)
+  await assert.rejects(rel({ fonte: 'vendas', metricas: ['sum(1)'] }), /Métrica inválida/)
+  const busca = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['item'], metricas: ['liquido'], filtros: { produto: "a'; select 1 --" } })
+  assert.ok(Array.isArray(busca.linhas))
+})
+
 // ---------- Mudanças no ERP ----------
 await erp.exec(`update documento set status = 'C' where _iddocumento = 11`)
 await erp.exec(`delete from mercadoria_estoque_lote where _lote = 'L2'`)

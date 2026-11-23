@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, RotateCw, Search } from 'lucide-react'
 import logo from './assets/logo-yupee.png'
+import { ExportarPagina } from './Exportar'
 
 /** Logo Yupee + nome do sistema (mesmo padrão do Gestão à Vista). */
 export function Brand() {
@@ -16,7 +17,7 @@ export function PageHead({ section, title, children, actions }: { section?: stri
         <h1>{title}</h1>
         {children && <p>{children}</p>}
       </div>
-      {actions && <div className="page-actions">{actions}</div>}
+      <div className="page-actions">{actions}<ExportarPagina titulo={title} /></div>
     </header>
   )
 }

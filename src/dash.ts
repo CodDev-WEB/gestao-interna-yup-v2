@@ -318,6 +318,27 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       return rows.flatMap(r => r.idmercadoria === null ? [] : [Number(r._idmercadoriavariacao), Number(r.idmercadoria)])
     }
 
+    // Relatório montado pelo usuário: a configuração vai inteira para a função relatorio(), que só aceita
+    // fontes, agrupamentos, métricas e filtros de listas fechadas.
+    case 'relatorio': {
+      let p: Record<string, unknown>
+      try { p = JSON.parse(q.get('p') ?? '{}') } catch { throw new DashError('Configuração do relatório inválida.') }
+      if (!p || typeof p !== 'object' || Array.isArray(p)) throw new DashError('Configuração do relatório inválida.')
+      for (const k of ['de', 'ate']) if (p[k] != null && !ISO.test(String(p[k]))) throw new DashError('Data inválida no relatório.')
+      try {
+        // Custo e lucro vêm do custo médio (frações de centavo): arredonda ao centavo, como o resto do relatório.
+        const r = await db.rpc<{ linhas: Record<string, unknown>[]; totais: Record<string, unknown> }>('relatorio', { p })
+        const cent = (o: Record<string, unknown>) => { for (const k of ['custo', 'lucro']) if (typeof o[k] === 'number') o[k] = Math.round((o[k] as number) * 100) / 100; return o }
+        r.linhas.forEach(cent); if (r.totais) cent(r.totais)
+        return r
+      }
+      catch (e) {
+        if (e instanceof SupabaseError && /PGRST202|function public\.relatorio/.test(e.message)) throw new DashError('O módulo de relatórios ainda não foi instalado no banco (migração 20261127000000_relatorio.sql).')
+        if (e instanceof SupabaseError && e.status < 500) throw new DashError(e.message.replace(/^Supabase \d+: /, ''))
+        throw e
+      }
+    }
+
     case 'meses':
       return db.select('vw_meses_movimento', 'select=mes,documentos&order=mes.desc').catch(() => [])
 

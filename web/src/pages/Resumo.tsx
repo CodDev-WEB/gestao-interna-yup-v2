@@ -1,3 +1,4 @@
+import { ExportarPagina } from '../Exportar'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AlertTriangle, ArrowDownUp, CalendarX, ChevronRight, Hourglass, PackageMinus, Percent, Receipt, TrendingDown, TrendingUp, UserMinus, Wallet, Wrench } from 'lucide-react'
@@ -93,6 +94,7 @@ export default function Resumo() {
         <div className="brief-top">
           <span className="brief-when">{saudacao()}. {hoje()}.</span>
           <Tabs label="Período" value={dias} options={PERIODOS} onChange={setDias} />
+          <ExportarPagina titulo="Visão geral" />
         </div>
         <h1 id="brief-h" className="brief-text">
           <span className="s">
