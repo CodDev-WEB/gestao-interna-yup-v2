@@ -747,7 +747,7 @@ h1, h2, h3 { text-wrap: balance; }
 .ver-mais:hover { text-decoration: underline; }
 
 /* Tabelas: nome do produto com espaço para não quebrar em várias linhas */
-.table-wrap td.wrap, .table-wrap th:first-child { min-width: 240px; }
+.table-wrap td.wrap { min-width: 240px; }
 .table-wrap tbody tr:hover td { background: rgba(11, 127, 137, 0.04); }
 
 /* Voltar ao topo */
@@ -780,7 +780,7 @@ h1, h2, h3 { text-wrap: balance; }
   .sheet-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line-2); margin-top: 14px; padding-top: 12px; }
   .topo { bottom: calc(84px + env(safe-area-inset-bottom)); right: 14px; }
   .page-actions .export-bar { order: 2; }
-  .table-wrap td.wrap, .table-wrap th:first-child { min-width: 0; }
+  .table-wrap td.wrap { min-width: 0; }
 }
 @media print { .tabbar, .topbar-celular, .topo { display: none !important; } }
 .table-wrap td small { white-space: normal; max-width: 240px; overflow-wrap: anywhere; }
@@ -795,3 +795,7 @@ h1, h2, h3 { text-wrap: balance; }
 @media (max-width: 760px) { .sheet-head .brand small { display: none; } .table-wrap td small { max-width: none; white-space: normal; } }
 /* Ficha do item sempre por cima das outras fichas (cliente, vendedora). */
 .drawer-root.ficha-item { z-index: 70; }
+
+/* Log de movimentações */
+.table-wrap td.col-op small { white-space: normal; max-width: 280px; }
+@media (max-width: 760px) { .field-inline .select { min-width: 0; width: 100%; } .field-inline { flex: 1 1 100%; } }

@@ -9,6 +9,7 @@ import {
   History, PackagePlus, PencilLine, Receipt, RotateCcw, ShoppingCart, Tag, TrendingUp, Undo2, X,
 } from 'lucide-react'
 import { useApi } from './api'
+import { LogItem } from './LogMovimentos'
 import { brl, data as fmtData, dec, int, mes, pct } from './format'
 import { situacao } from './labels'
 import { Empty, ErrorState, Loading, Metric, Tabs } from './ui'
@@ -39,7 +40,7 @@ type Ficha = {
   carga: { historico_preco: boolean; historico_saldo: boolean; vendas: boolean }
 }
 
-type Aba = 'geral' | 'lotes' | 'entradas' | 'precos' | 'tempo'
+type Aba = 'geral' | 'lotes' | 'entradas' | 'precos' | 'log' | 'tempo'
 
 /** Abre a ficha de um item mantendo a página e os filtros atuais. */
 export function useAbrirItem() {
@@ -399,6 +400,7 @@ export default function ProdutoPainel() {
                   { id: 'lotes', label: `Lotes${lotesAtivos ? ` (${lotesAtivos})` : ''}` },
                   { id: 'entradas', label: `Entradas${atual.entradas.length ? ` (${atual.entradas.length})` : ''}` },
                   { id: 'precos', label: 'Preços' },
+                  { id: 'log', label: 'Log' },
                   { id: 'tempo', label: 'Linha do tempo' },
                 ]} />
               </div>
@@ -406,6 +408,7 @@ export default function ProdutoPainel() {
               {aba === 'lotes' && <Lotes f={atual} />}
               {aba === 'entradas' && <Entradas f={atual} />}
               {aba === 'precos' && <Precos f={atual} />}
+              {aba === 'log' && <LogItem variacao={atual.item.id} />}
               {aba === 'tempo' && <LinhaDoTempo f={atual} />}
             </>
           )}

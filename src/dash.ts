@@ -341,6 +341,19 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       }
     }
 
+    // Log de modificações dos itens (saldo, preço): quem, quando, operação, documento, antes e depois.
+    case 'log': {
+      const v = q.get('variacao'), tipo = pick(q.get('tipo'), ['venda', 'devolucao', 'entrada', 'implantacao', 'ajuste', 'outra_entrada', 'outra_saida', 'preco', 'entradas', 'saidas', 'outro'])
+      const u = q.get('usuario'), s = busca(q.get('busca'))
+      const de = ISO.test(q.get('de') ?? '') ? q.get('de') : null, ate = ISO.test(q.get('ate') ?? '') ? q.get('ate') : null
+      const p = { variacao: v && /^\d{1,12}$/.test(v) ? Number(v) : null, tipo, usuario: u && /^\d{1,12}$/.test(u) ? Number(u) : null, busca: s || null, de, ate,
+        limite: int(q.get('limit'), 50, 1, 500), offset: int(q.get('offset'), 0, 0, 10_000_000) }
+      try { return await db.rpc('log_movimentos', { p }) }
+      catch (e) { if (e instanceof SupabaseError && /PGRST202|log_movimentos/.test(e.message)) throw new DashError('O log de modificações ainda não foi instalado no banco (migração 20261201000000_log_movimentos.sql).'); throw e }
+    }
+    case 'log-usuarios':
+      return db.rpc('log_usuarios', {}).catch(() => [])
+
     case 'meses':
       return db.select('vw_meses_movimento', 'select=mes,documentos&order=mes.desc').catch(() => [])
 

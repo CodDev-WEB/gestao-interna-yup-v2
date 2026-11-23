@@ -514,6 +514,17 @@ await test('alinhamento: venda que chegou depois da leitura do saldo já baixa o
   }
 })
 
+await test('log do item: cada mudança de saldo com operação, documento, quem lançou e saldo antes/depois', async () => {
+  const r = (await sb.query<{ r: { linhas: any[]; total: number } }>(`select log_movimentos('{"variacao": 999, "limite": 5}') as r`)).rows[0].r
+  assert.ok(r.total > 0 && r.linhas.length === 5)
+  const l = r.linhas[0]
+  assert.equal(l.tipo, 'venda'); assert.equal(Number(l.quantidade), Number(l.depois) - Number(l.antes))
+  assert.ok(r.linhas.every((x: any, i: number, a: any[]) => i === 0 || a[i - 1].datahora >= x.datahora), 'mais recente primeiro')
+  const vendas = (await sb.query<{ r: { total: number } }>(`select log_movimentos('{"tipo": "entrada"}') as r`)).rows[0].r
+  assert.ok(vendas.total >= 0)
+  await sb.query(`select log_usuarios()`)
+})
+
 // ---------- Mudanças no ERP ----------
 await erp.exec(`update documento set status = 'C' where _iddocumento = 11`)
 await erp.exec(`delete from mercadoria_estoque_lote where _lote = 'L2'`)

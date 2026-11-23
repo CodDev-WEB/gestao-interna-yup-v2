@@ -24,6 +24,7 @@ import Qualidade from './pages/Qualidade'
 import Vendedoras from './pages/Vendedoras'
 import Auditoria from './pages/Auditoria'
 import Relatorios from './pages/Relatorios'
+import LogMovimentacoes from './pages/LogMovimentacoes'
 
 import { GRUPOS, dentroDe, paginaAtual, type ItemNav } from './nav'
 
@@ -31,7 +32,7 @@ import { GRUPOS, dentroDe, paginaAtual, type ItemNav } from './nav'
 const ATALHOS = [
   { to: '/', label: 'Início', icon: LayoutDashboard, end: true },
   { to: '/mes', label: 'Vendas', icon: CalendarRange, prefixos: ['/mes', '/vendedoras', '/clientes'] },
-  { to: '/produtos', label: 'Estoque', icon: Package, prefixos: ['/produtos', '/compras', '/fornecedores', '/conciliacao', '/setores'] },
+  { to: '/produtos', label: 'Estoque', icon: Package, prefixos: ['/produtos', '/compras', '/fornecedores', '/conciliacao', '/setores', '/log'] },
   { to: '/validades', label: 'Validades', icon: CalendarClock },
 ]
 
@@ -154,6 +155,7 @@ function App() {
           <Route path="/vendedoras" element={<Vendedoras />} />
           <Route path="/auditoria" element={<Auditoria />} />
           <Route path="/relatorios" element={<Relatorios />} />
+          <Route path="/log" element={<LogMovimentacoes />} />
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/validades" element={<Validades />} />
           <Route path="/fornecedores" element={<Fornecedores />} />
