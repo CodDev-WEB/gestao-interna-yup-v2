@@ -92,40 +92,45 @@ function ds(name: string, table: keyof typeof C, kind: Kind, refreshMinutes: num
   return { name, table, kind, keys: keysOf(columns), columns, refreshMinutes, recentFilter, filter, description }
 }
 
-const docWindow = (from: string) => `t._iddocumento IN (SELECT d._iddocumento FROM documento d WHERE d.datahora >= ${from})`
+
+// Só a Yup (empresa 1). A empresa 2 usa o mesmo ERP, mas não faz parte deste sistema: nada dela é lido.
+export const EMPRESA_YUP = 1
+const SO_YUP = `t._idempresa = ${EMPRESA_YUP}`
+const docWindow = (from: string) => `t._iddocumento IN (SELECT d._iddocumento FROM documento d WHERE d.datahora >= ${from} AND d.idempresa = ${EMPRESA_YUP})`
+const SO_YUP_DOC = `t._iddocumento NOT IN (SELECT d._iddocumento FROM documento d WHERE d.idempresa <> ${EMPRESA_YUP})`
 
 /**
  * Ordem = prioridade de execução. Dados transacionais vêm primeiro para que snapshots longos
  * não impeçam a chegada de documentos, itens e custos novos.
  */
 export const DATASETS: Dataset[] = [
-  ds('documento', 'documento', 'append', 5, 'Documentos novos (vendas, compras, devoluções...)'),
-  ds('documento_mercadoria', 'documento_mercadoria', 'append', 5, 'Itens dos documentos novos'),
-  ds('documento_mercadoria_custo', 'documento_mercadoria_custo', 'append', 5, 'Custo dos itens dos documentos novos'),
+  ds('documento', 'documento', 'append', 5, 'Documentos novos (vendas, compras, devoluções...)', undefined, `t.idempresa = ${EMPRESA_YUP}`),
+  ds('documento_mercadoria', 'documento_mercadoria', 'append', 5, 'Itens dos documentos novos', undefined, SO_YUP_DOC),
+  ds('documento_mercadoria_custo', 'documento_mercadoria_custo', 'append', 5, 'Custo dos itens dos documentos novos', undefined, SO_YUP_DOC),
   ds('mercadoria_secao', 'mercadoria_secao', 'snapshot', 1440, 'Seções (setores) das mercadorias'),
   ds('mercadoria_grupo', 'mercadoria_grupo', 'snapshot', 1440, 'Grupos das mercadorias'),
   ds('mercadoria_subgrupo', 'mercadoria_subgrupo', 'snapshot', 1440, 'Subgrupos das mercadorias'),
   ds('mercadoria_marca', 'mercadoria_marca', 'snapshot', 1440, 'Marcas'),
-  ds('natureza_operacao', 'natureza_operacao', 'snapshot', 1440, 'Naturezas de operação (regras de estoque/financeiro)'),
-  ds('local_estoque', 'local_estoque', 'snapshot', 1440, 'Locais de estoque'),
+  ds('natureza_operacao', 'natureza_operacao', 'snapshot', 1440, 'Naturezas de operação (regras de estoque/financeiro)', undefined, SO_YUP),
+  ds('local_estoque', 'local_estoque', 'snapshot', 1440, 'Locais de estoque', undefined, SO_YUP),
   ds('mercadoria', 'mercadoria', 'snapshot', 1440, 'Cadastro de mercadorias'),
   ds('mercadoria_variacao', 'mercadoria_variacao', 'snapshot', 1440, 'Variações (SKU, embalagem, código de barras)'),
   ds('ncm', 'ncm', 'snapshot', 1440, 'Descrições oficiais dos NCMs usados nos produtos', undefined,
     't._ncm IN (SELECT m.ncm FROM mercadoria m WHERE m.ncm IS NOT NULL UNION SELECT v.ncm FROM mercadoria_variacao v WHERE v.ncm IS NOT NULL)'),
   ds('pessoa', 'pessoa', 'snapshot', 1440, 'Clientes, fornecedores e funcionários (sem documentos pessoais)'),
   ds('mercadoria_fornecedor', 'mercadoria_fornecedor', 'snapshot', 1440, 'Fornecedores de cada variação'),
-  ds('mercadoria_estoque', 'mercadoria_estoque', 'snapshot', 360, 'Saldo atual por local'),
-  ds('mercadoria_custo', 'mercadoria_custo', 'snapshot', 1440, 'Custo e custo médio atuais'),
-  ds('mercadoria_estoque_lote', 'mercadoria_estoque_lote', 'snapshot', 720, 'Saldo por lote e validade'),
-  ds('mercadoria_tabela_preco', 'mercadoria_tabela_preco', 'snapshot', 1440, 'Preços de venda atuais'),
-  ds('inventario', 'inventario', 'snapshot', 360, 'Inventários'),
-  ds('inventario_mercadoria', 'inventario_mercadoria', 'snapshot', 1440, 'Contagens de inventário'),
-  ds('documento_recente', 'documento', 'recent', 720, 'Relê documentos dos últimos dias (status e cancelamentos)', from => `t.datahora >= ${from}`),
+  ds('mercadoria_estoque', 'mercadoria_estoque', 'snapshot', 360, 'Saldo atual por local', undefined, SO_YUP),
+  ds('mercadoria_custo', 'mercadoria_custo', 'snapshot', 1440, 'Custo e custo médio atuais', undefined, SO_YUP),
+  ds('mercadoria_estoque_lote', 'mercadoria_estoque_lote', 'snapshot', 720, 'Saldo por lote e validade', undefined, SO_YUP),
+  ds('mercadoria_tabela_preco', 'mercadoria_tabela_preco', 'snapshot', 1440, 'Preços de venda atuais', undefined, SO_YUP),
+  ds('inventario', 'inventario', 'snapshot', 360, 'Inventários', undefined, `t.idempresa = ${EMPRESA_YUP}`),
+  ds('inventario_mercadoria', 'inventario_mercadoria', 'snapshot', 1440, 'Contagens de inventário', undefined, `t._idinventario IN (SELECT i._idinventario FROM inventario i WHERE i.idempresa = ${EMPRESA_YUP})`),
+  ds('documento_recente', 'documento', 'recent', 720, 'Relê documentos dos últimos dias (status e cancelamentos)', from => `t.datahora >= ${from}`, `t.idempresa = ${EMPRESA_YUP}`),
   ds('documento_mercadoria_recente', 'documento_mercadoria', 'recent', 720, 'Relê itens dos documentos dos últimos dias', docWindow),
   ds('documento_mercadoria_custo_recente', 'documento_mercadoria_custo', 'recent', 720, 'Relê custos dos itens dos últimos dias', docWindow),
-  ds('documento_cancelamento_historico', 'documento_cancelamento_historico', 'append', 15, 'Cancelamentos de documentos'),
-  ds('mercadoria_tabela_preco_historico', 'mercadoria_tabela_preco_historico', 'append', 60, 'Histórico de alterações de preço'),
-  ds('mercadoria_estoque_historico', 'mercadoria_estoque_historico', 'append', 30, 'Histórico de saldos (linha do tempo do estoque)'),
+  ds('documento_cancelamento_historico', 'documento_cancelamento_historico', 'append', 15, 'Cancelamentos de documentos', undefined, SO_YUP_DOC),
+  ds('mercadoria_tabela_preco_historico', 'mercadoria_tabela_preco_historico', 'append', 60, 'Histórico de alterações de preço', undefined, SO_YUP),
+  ds('mercadoria_estoque_historico', 'mercadoria_estoque_historico', 'append', 30, 'Histórico de saldos (linha do tempo do estoque)', undefined, SO_YUP_DOC),
 ]
 
 // Defesa: identificadores entram no SQL sem aspas, então só letras minúsculas, números e "_".

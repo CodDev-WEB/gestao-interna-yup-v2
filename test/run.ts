@@ -77,7 +77,7 @@ await test('assertReadOnly: só SELECT, sem ; ou comentário', () => {
 await test('buildSelect: keyset composto e janela', () => {
   const d = DATASETS.find(x => x.name === 'documento_mercadoria_recente')!
   const sql = buildSelect(d, [10, 2], '2026-11-01')
-  assert.match(sql, /WHERE t\._iddocumento IN \(SELECT d\._iddocumento FROM documento d WHERE d\.datahora >= '2026-11-01'\) AND \(t\._iddocumento, t\._idsequencia\) > \(10, 2\) ORDER BY t\._iddocumento, t\._idsequencia$/)
+  assert.match(sql, /WHERE t\._iddocumento IN \(SELECT d\._iddocumento FROM documento d WHERE d\.datahora >= '2026-11-01' AND d\.idempresa = 1\) AND \(t\._iddocumento, t\._idsequencia\) > \(10, 2\) ORDER BY t\._iddocumento, t\._idsequencia$/)
 })
 await test('isDue: intervalo, ciclo em andamento e espera após erro', () => {
   const d = DATASETS.find(x => x.name === 'mercadoria_estoque')!
@@ -164,8 +164,13 @@ await doc({ id: 11, ...venda, dia: -5, itens: [[1, 100, 1, 15, 10], [2, 110, 1, 
 await doc({ id: 12, ...venda, dia: -100, itens: [[1, 130, 5, 60, 8]] })
 await doc({ id: 13, ...venda, status: 'C', dia: -3, itens: [[1, 100, 50, 750, 10]] })
 await doc({ id: 20, tm: 'E', tf: 'P', status: 'E', modelo: 'TM', pessoa: 600, dia: -4, itens: [[1, 100, 1, 15]] })
-// Volume para paginação (empresa 2, item próprio): 230 documentos × 2 itens.
-for (let i = 0; i < 230; i++) await doc({ id: 1000 + i, empresa: 2, ...venda, pessoa: 0, dia: -(i % 60), itens: [[1, 999, 1, 2, 1], [2, 999, 2, 4, 1]] })
+// Volume para paginação (item próprio): 230 documentos × 2 itens.
+// Dias sem os documentos de teste (3, 4, 5, 10 e 30 dias atrás), para não mudar os totais conferidos abaixo.
+const diasVolume = Array.from({ length: 60 }, (_, d) => d).filter(d => ![3, 4, 5, 10, 30].includes(d))
+for (let i = 0; i < 230; i++) await doc({ id: 1000 + i, empresa: 1, ...venda, pessoa: 0, dia: -diasVolume[i % diasVolume.length], itens: [[1, 999, 1, 2, 1], [2, 999, 2, 4, 1]] })
+// Empresa 2: está no mesmo ERP, mas não faz parte do sistema da Yup e não pode ser lida.
+await doc({ id: 5001, empresa: 2, ...venda, dia: -3, itens: [[1, 100, 7, 700, 10]] })
+await ins('mercadoria_estoque', [{ _idempresa: 2, _idlocalestoque: 1, _idmercadoriavariacao: 100, qtdsaldo: 500, qtdsaldoreserva: 0, datahora: at(-1) }])
 await ins('mercadoria_estoque_historico', Array.from({ length: 140 }, (_, i) => ({ _idhistorico: i + 1, _iddocumento: 1000 + (i % 230), _idlocalestoque: 1, idmercadoriavariacao: 999, datahora: at(-(i % 60)), qtdsaldoatual: i, qtdnovosaldo: i - 1 })))
 await ins('mercadoria_tabela_preco_historico', [{ _idhistorico: 1, _idempresa: 1, _idmercadoriavariacao: 100, _idtabela: 1, datahora: at(-20), valprecotual: 14, valpreconovo: 15 }])
 await ins('inventario', [{ _idinventario: 1, idempresa: 1, descricao: 'GERAL', idlocalestoque: 1, status: 'F', datahora: at(-15) }])
@@ -285,6 +290,11 @@ await test('valores convertidos com fidelidade (hora local → UTC, texto com as
   assert.equal(Number(l.qtdsaldo), 4)
   const p = await one<{ nome: string }>('select nome from erp_pessoa where _idpessoa = 500')
   assert.equal(p.nome, "DISTRIBUIDORA D'OESTE")
+})
+await test('só a empresa 1 (Yup): documentos, itens e saldo da empresa 2 não entram', async () => {
+  assert.equal(await count(sb, 'select count(*) as n from erp_documento where idempresa <> 1'), 0)
+  assert.equal(await count(sb, 'select count(*) as n from erp_documento_mercadoria where _iddocumento = 5001'), 0)
+  assert.equal(await count(sb, 'select count(*) as n from erp_mercadoria_estoque where _idempresa <> 1'), 0)
 })
 await test('views: vendas, cancelada fora, lucro, devolução, margem', async () => {
   assert.equal(await count(sb, 'select count(*) as n from vw_venda_item where iddocumento = 13'), 0)
@@ -465,8 +475,8 @@ await test('relatório montado: agrupa, soma ao centavo, filtra e recusa o que n
   assert.ok(porMes.linhas.every((l: any, i: number, a: any[]) => i === 0 || a[i - 1].mes <= l.mes), 'meses em ordem')
   const itens = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['item'], metricas: ['qtd', 'liquido'], limite: 2 })
   assert.ok(itens.linhas.length <= 2 && 'produto' in itens.linhas[0] && 'codigo' in itens.linhas[0])
-  const filtrado = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['empresa'], metricas: ['liquido'], filtros: { empresa: 2 } })
-  assert.ok(filtrado.linhas.every((l: any) => Number(l.empresa) === 2))
+  const filtrado = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['empresa'], metricas: ['liquido'], filtros: { empresa: 1 } })
+  assert.ok(filtrado.linhas.every((l: any) => Number(l.empresa) === 1))
   for (const fonte of ['compras', 'devolucoes', 'estoque', 'validades']) await rel({ fonte, de: day(-400), ate: day(400), grupos: ['setor'], metricas: ['qtd', 'custo'] })
   const val = await rel({ fonte: 'validades', de: day(-400), ate: day(400), grupos: ['item'], metricas: ['qtd'] })
   const chaves = val.linhas.map((l: any) => [l.proxima_validade < today ? 1 : 0, l.proxima_validade])

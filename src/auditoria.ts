@@ -9,6 +9,7 @@
 import type { ErpClient, RawRow } from './erp/client'
 import type { Supabase } from './supabase/client'
 import { assertReadOnly } from './sync/sql'
+import { EMPRESA_YUP } from './sync/datasets'
 
 type Valor = string | number | null | undefined
 
@@ -100,9 +101,9 @@ export async function auditar(erp: ErpClient, db: Supabase, agora = new Date()) 
   const corteErp = `'${hoje} 00:00:00'` // datahora no ERP é a hora local da loja
   const corteSistema = `${hoje}T00:00:00-03:00` // Belém: UTC-3, sem horário de verão
 
-  const sqlClasses = `SELECT to_char(d.datahora, 'YYYY-MM') AS mes, COALESCE(d.modelo, '') AS modelo, COALESCE(d.tipomovimento, '') AS tm, COALESCE(d.tipomovimentofinanceiro, '') AS tf, COALESCE(d.status, '') AS status, COUNT(DISTINCT d._iddocumento) AS docs, COUNT(*) AS itens, COALESCE(SUM(dm.qtd), 0) AS qtd, COALESCE(SUM(dm.valtotalliquido), 0) AS valor, COALESCE(SUM(dm.valtotalbruto), 0) AS bruto, COALESCE(SUM(dm.valdesconto), 0) AS desconto FROM documento d JOIN documento_mercadoria dm ON dm._iddocumento = d._iddocumento WHERE d.datahora < ${corteErp} GROUP BY to_char(d.datahora, 'YYYY-MM'), COALESCE(d.modelo, ''), COALESCE(d.tipomovimento, ''), COALESCE(d.tipomovimentofinanceiro, ''), COALESCE(d.status, '') ORDER BY 1, 2, 3, 4, 5`
-  const sqlVendedoras = `SELECT to_char(d.datahora, 'YYYY-MM') AS mes, COALESCE(dm.idpessoafuncionario, 0) AS vendedora, COUNT(DISTINCT d._iddocumento) AS docs, COUNT(*) AS itens, COALESCE(SUM(dm.qtd), 0) AS qtd, COALESCE(SUM(dm.valtotalliquido), 0) AS valor FROM documento d JOIN documento_mercadoria dm ON dm._iddocumento = d._iddocumento WHERE d.datahora < ${corteErp} AND d.tipomovimento = 'S' AND d.tipomovimentofinanceiro = 'R' AND d.status = 'E' GROUP BY to_char(d.datahora, 'YYYY-MM'), COALESCE(dm.idpessoafuncionario, 0) ORDER BY 1, 2`
-  const sqlEstoque = 'SELECT COUNT(*) AS linhas, COALESCE(SUM(e.qtdsaldo), 0) AS qtd FROM mercadoria_estoque e'
+  const sqlClasses = `SELECT to_char(d.datahora, 'YYYY-MM') AS mes, COALESCE(d.modelo, '') AS modelo, COALESCE(d.tipomovimento, '') AS tm, COALESCE(d.tipomovimentofinanceiro, '') AS tf, COALESCE(d.status, '') AS status, COUNT(DISTINCT d._iddocumento) AS docs, COUNT(*) AS itens, COALESCE(SUM(dm.qtd), 0) AS qtd, COALESCE(SUM(dm.valtotalliquido), 0) AS valor, COALESCE(SUM(dm.valtotalbruto), 0) AS bruto, COALESCE(SUM(dm.valdesconto), 0) AS desconto FROM documento d JOIN documento_mercadoria dm ON dm._iddocumento = d._iddocumento WHERE d.idempresa = ${EMPRESA_YUP} AND d.datahora < ${corteErp} GROUP BY to_char(d.datahora, 'YYYY-MM'), COALESCE(d.modelo, ''), COALESCE(d.tipomovimento, ''), COALESCE(d.tipomovimentofinanceiro, ''), COALESCE(d.status, '') ORDER BY 1, 2, 3, 4, 5`
+  const sqlVendedoras = `SELECT to_char(d.datahora, 'YYYY-MM') AS mes, COALESCE(dm.idpessoafuncionario, 0) AS vendedora, COUNT(DISTINCT d._iddocumento) AS docs, COUNT(*) AS itens, COALESCE(SUM(dm.qtd), 0) AS qtd, COALESCE(SUM(dm.valtotalliquido), 0) AS valor FROM documento d JOIN documento_mercadoria dm ON dm._iddocumento = d._iddocumento WHERE d.idempresa = ${EMPRESA_YUP} AND d.datahora < ${corteErp} AND d.tipomovimento = 'S' AND d.tipomovimentofinanceiro = 'R' AND d.status = 'E' GROUP BY to_char(d.datahora, 'YYYY-MM'), COALESCE(dm.idpessoafuncionario, 0) ORDER BY 1, 2`
+  const sqlEstoque = `SELECT COUNT(*) AS linhas, COALESCE(SUM(e.qtdsaldo), 0) AS qtd FROM mercadoria_estoque e WHERE e._idempresa = ${EMPRESA_YUP}`
 
   const inicio = Date.now()
   const sistema = await db.rpc<{ classes: Record<string, Valor>[]; vendedoras: Record<string, Valor>[]; estoque: Record<string, Valor>; orfaos: number[] }>('auditoria_espelho', { p_ate: corteSistema })
