@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { BadgeCheck, FileBarChart, CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, IdCard, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
+import { ArrowUp, BadgeCheck, FileBarChart, Menu as MenuIcon, X, CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, IdCard, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
 import './styles.css'
 import { currentUser, logout, onAuthChange } from './api'
 import { Brand } from './ui'
@@ -25,41 +25,93 @@ import Vendedoras from './pages/Vendedoras'
 import Auditoria from './pages/Auditoria'
 import Relatorios from './pages/Relatorios'
 
-const NAV = [
-  { to: '/', label: 'Visão geral', icon: LayoutDashboard, end: true },
-  { to: '/mes', label: 'Resumo do mês', icon: CalendarRange },
-  { to: '/compras', label: 'Compras', icon: ShoppingCart },
-  { to: '/produtos', label: 'Produtos e estoque', icon: Package },
+import { GRUPOS, dentroDe, paginaAtual, type ItemNav } from './nav'
+
+/** Atalhos da barra de baixo no celular. */
+const ATALHOS = [
+  { to: '/', label: 'Início', icon: LayoutDashboard, end: true },
+  { to: '/mes', label: 'Vendas', icon: CalendarRange, prefixos: ['/mes', '/vendedoras', '/clientes'] },
+  { to: '/produtos', label: 'Estoque', icon: Package, prefixos: ['/produtos', '/compras', '/fornecedores', '/conciliacao', '/setores'] },
   { to: '/validades', label: 'Validades', icon: CalendarClock },
-  { to: '/conciliacao', label: 'Conciliação', icon: ClipboardCheck },
-  { to: '/fornecedores', label: 'Fornecedores', icon: Truck },
-  { to: '/clientes', label: 'Clientes', icon: Users },
-  { to: '/vendedoras', label: 'Vendedoras', icon: IdCard },
-  { to: '/setores', label: 'Setores', icon: Shapes, filhos: SUBABAS_SETORES },
-  { to: '/relatorios', label: 'Relatórios', icon: FileBarChart },
-  { to: '/auditoria', label: 'Auditoria de valores', icon: BadgeCheck },
-  { to: '/qualidade', label: 'Qualidade do dado', icon: ShieldAlert },
-  { to: '/sincronizacao', label: 'Sincronização', icon: RefreshCw },
 ]
 
-type ItemNav = { to: string; label: string; icon: typeof Shapes; end?: boolean; filhos?: { to: string; label: string; end?: boolean }[] }
-
 /** Item do menu; com subabas, vira um grupo recolhível (abre sozinho quando a página atual é dele). */
-function ItemMenu({ item }: { item: ItemNav }) {
+function ItemMenu({ item, onNavegar }: { item: ItemNav; onNavegar?: () => void }) {
   const { pathname } = useLocation()
-  const dentro = pathname === item.to || pathname.startsWith(item.to + '/')
+  const dentro = dentroDe(pathname, item.to)
   const [aberto, setAberto] = useState(dentro)
   useEffect(() => { if (dentro) setAberto(true) }, [dentro])
   const Icon = item.icon
-  if (!item.filhos) return <NavLink to={item.to} end={item.end}><Icon size={18} aria-hidden />{item.label}<ChevronRight size={14} className="chev" aria-hidden /></NavLink>
+  if (!item.filhos) return <NavLink to={item.to} end={item.end} onClick={onNavegar}><Icon size={18} aria-hidden />{item.label}</NavLink>
   return (
     <div className={`nav-group${aberto ? ' open' : ''}`}>
       <button type="button" className={`nav-toggle${dentro ? ' active' : ''}`} aria-expanded={aberto} aria-controls={`sub-${item.to}`} onClick={() => setAberto(a => !a)}>
         <Icon size={18} aria-hidden />{item.label}<ChevronRight size={14} className="chev" aria-hidden />
       </button>
-      {aberto && <div className="nav-sub" id={`sub-${item.to}`}>{item.filhos.map(f => <NavLink key={f.to} to={f.to} end={f.end}>{f.label}</NavLink>)}</div>}
+      {aberto && <div className="nav-sub" id={`sub-${item.to}`}>{item.filhos.map(f => <NavLink key={f.to} to={f.to} end={f.end} onClick={onNavegar}>{f.label}</NavLink>)}</div>}
     </div>
   )
+}
+
+function Menu({ onNavegar }: { onNavegar?: () => void }) {
+  return (
+    <nav aria-label="Seções" className="menu">
+      {GRUPOS.map((g, i) => (
+        <div key={i} className="menu-grupo" role="group" aria-label={g.titulo ?? 'Início'}>
+          {g.titulo && <div className="menu-titulo">{g.titulo}</div>}
+          {g.itens.map(item => <ItemMenu key={item.to} item={item} onNavegar={onNavegar} />)}
+        </div>
+      ))}
+    </nav>
+  )
+}
+
+/** Celular: barra fixa embaixo com os atalhos e o menu completo numa folha que sobe. */
+function BarraCelular({ user }: { user: string }) {
+  const { pathname } = useLocation()
+  const [aberto, setAberto] = useState(false)
+  useEffect(() => { setAberto(false) }, [pathname])
+  useEffect(() => {
+    if (!aberto) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false) }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', onKey)
+    return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey) }
+  }, [aberto])
+  return (
+    <>
+      <nav className="tabbar" aria-label="Atalhos">
+        {ATALHOS.map(a => {
+          const ativo = a.prefixos ? a.prefixos.some(p => dentroDe(pathname, p)) : dentroDe(pathname, a.to)
+          const Icon = a.icon
+          return <NavLink key={a.to} to={a.to} end={a.end} className={ativo ? 'active' : undefined} aria-current={ativo ? 'page' : undefined}><Icon size={21} aria-hidden /><span>{a.label}</span></NavLink>
+        })}
+        <button type="button" className={aberto ? 'active' : undefined} onClick={() => setAberto(a => !a)} aria-expanded={aberto} aria-controls="menu-celular"><MenuIcon size={21} aria-hidden /><span>Menu</span></button>
+      </nav>
+      {aberto && (
+        <div className="sheet-root">
+          <div className="sheet-backdrop" onClick={() => setAberto(false)} aria-hidden />
+          <div className="sheet" id="menu-celular" role="dialog" aria-modal="true" aria-label="Menu">
+            <div className="sheet-head"><Brand /><button type="button" className="drawer-close" onClick={() => setAberto(false)} aria-label="Fechar menu"><X size={20} aria-hidden /></button></div>
+            <Menu onNavegar={() => setAberto(false)} />
+            <div className="sheet-foot"><span className="sidebar-user">{user}</span><button type="button" className="btn secondary small" onClick={logout}><LogOut size={15} aria-hidden />Sair</button></div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+/** Volta ao topo quando a página fica longa. */
+function VoltarTopo() {
+  const [ver, setVer] = useState(false)
+  useEffect(() => {
+    const f = () => setVer(window.scrollY > 900)
+    window.addEventListener('scroll', f, { passive: true }); f()
+    return () => window.removeEventListener('scroll', f)
+  }, [])
+  if (!ver) return null
+  return <button type="button" className="topo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Voltar ao topo"><ArrowUp size={18} aria-hidden /></button>
 }
 
 function App() {
@@ -72,23 +124,26 @@ function App() {
   const primeira = useRef(true)
   useEffect(() => {
     if (primeira.current) { primeira.current = false; return }
+    window.scrollTo(0, 0) // página nova sempre abre no topo
     mainRef.current?.focus({ preventScroll: true })
   }, [pathname])
+  const atual = paginaAtual(pathname)
   if (!user) return <Login />
   return (
     <div className="shell">
       <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
       <aside className="sidebar">
         <NavLink to="/" className="brand" aria-label="YUP Intelligence, ir para a visão geral"><Brand /></NavLink>
-        <div className="sidebar-label">Gestão da loja</div>
-        <nav aria-label="Seções">
-          {(NAV as ItemNav[]).map(item => <ItemMenu key={item.to} item={item} />)}
-        </nav>
+        <Menu />
         <div className="sidebar-bottom">
           <span className="sidebar-user">{user}</span>
           <button onClick={logout} aria-label="Sair"><LogOut size={17} aria-hidden /><span className="sidebar-user-txt">Sair</span></button>
         </div>
       </aside>
+      <header className="topbar-celular">
+        <NavLink to="/" className="brand" aria-label="YUP Intelligence, ir para a visão geral"><Brand /></NavLink>
+        {atual && <span className="topbar-pagina">{atual.grupo ? `${atual.grupo} · ` : ''}{atual.item.label}</span>}
+      </header>
       <main className="content" id="conteudo" ref={mainRef} tabIndex={-1}>
         <Routes>
           <Route path="/" element={<Resumo />} />
@@ -111,6 +166,8 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <BarraCelular user={user} />
+      <VoltarTopo />
       <ProdutoPainel />
       <ClientePainel />
     </div>

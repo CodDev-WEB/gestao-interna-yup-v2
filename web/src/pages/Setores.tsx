@@ -1,3 +1,4 @@
+import { SUBABAS_SETORES } from '../nav'
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -51,12 +52,7 @@ function Classificacao({ secoes, error, reload, onSaved }: { secoes: Secao[] | n
 }
 
 /** Subabas de Setores (no celular aparecem no topo; no computador ficam no menu lateral). */
-export const SUBABAS_SETORES = [
-  { to: '/setores', label: 'Comparativo', end: true },
-  { to: '/setores/categorias', label: 'Categorias (NCM)' },
-  { to: '/setores/regras', label: 'Regras por NCM' },
-  { to: '/setores/secoes', label: 'Seções do ERP' },
-]
+export { SUBABAS_SETORES }
 export function SetoresTabs() {
   return <nav className="sub-tabs" aria-label="Subabas de Setores">{SUBABAS_SETORES.map(s => <NavLink key={s.to} to={s.to} end={s.end}>{s.label}</NavLink>)}</nav>
 }

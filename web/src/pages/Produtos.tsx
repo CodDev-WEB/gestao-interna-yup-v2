@@ -35,11 +35,11 @@ function Lista() {
     { key: 'valor_estoque', label: 'Valor (custo)', right: true, sort: true, className: 'money', render: r => brl(r.valor_estoque) },
     { key: 'compra', label: 'Último preço de compra', right: true, render: r => r.ultimo_preco_compra === null ? <span className="muted">—</span> : <>{brl(r.ultimo_preco_compra)}<small>{r.ultimo_fornecedor ?? '—'} · {data(r.ultima_compra)}</small></> },
     { key: 'qtd_90d', label: 'Vendido 90d', right: true, sort: true, render: r => dec(r.qtd_90d) },
-    { key: 'faturamento_90d', label: 'Faturamento 90d', right: true, sort: true, sm: false, render: r => brl(r.faturamento_90d) },
-    { key: 'margem_90d_pct', label: 'Margem 90d', right: true, sort: true, sm: false, render: r => pct(r.margem_90d_pct) },
-    { key: 'ultima_venda', label: 'Última venda', right: true, sort: true, sm: false, render: r => data(r.ultima_venda) },
+    { key: 'faturamento_90d', extra: true, label: 'Faturamento 90d', right: true, sort: true, sm: false, render: r => brl(r.faturamento_90d) },
+    { key: 'margem_90d_pct', extra: true, label: 'Margem 90d', right: true, sort: true, sm: false, render: r => pct(r.margem_90d_pct) },
+    { key: 'ultima_venda', extra: true, label: 'Última venda', right: true, sort: true, sm: false, render: r => data(r.ultima_venda) },
     { key: 'dias_sem_venda', label: 'Dias sem venda', right: true, sort: true, render: r => int(r.dias_sem_venda) },
-    { key: 'cobertura_dias', label: 'Cobertura (dias)', right: true, sort: true, sm: false, render: r => int(r.cobertura_dias) },
+    { key: 'cobertura_dias', extra: true, label: 'Cobertura (dias)', right: true, sort: true, sm: false, render: r => int(r.cobertura_dias) },
   ]
 
   return (

@@ -14,6 +14,7 @@ import { dash, DashError, salvarContagem, salvarRegraNcm, salvarSecao } from './
 import { diagnosticar, diagnosticarVarios, lerErro } from './sync/diagnostico'
 import { descobrirColunas } from './erp/descoberta'
 import { auditarEGravar } from './auditoria'
+import { limparOutrasEmpresas } from './limpeza'
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data, null, 2), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
@@ -375,6 +376,10 @@ export default {
       ctx.waitUntil(auditarEGravar(new ErpClient(env), db).catch(e => console.error('auditoria falhou', e)))
       return
     }
+    // Enquanto houver dados de outra empresa no espelho, apaga um pouco a cada rodada (antes da sincronização).
+    const sobrou = await db.select('erp_documento', `idempresa=neq.1&select=_iddocumento&limit=1`).catch(() => [])
+    const sobrouEstoque = sobrou.length ? sobrou : await db.select('erp_mercadoria_estoque', `_idempresa=neq.1&select=_idempresa&limit=1`).catch(() => [])
+    if (sobrouEstoque.length) { ctx.waitUntil(limparOutrasEmpresas(db).then(n => console.log('limpeza de outra empresa', n)).catch(e => console.error('limpeza falhou', e))); return } // limite de subrequests: esta rodada não sincroniza
     // A cada 15 minutos, depois da sincronização: recalcula a curva ABC pronta (mv_produto_abc) usada pelas telas de gestão.
     const atualizarGestao = new Date(controller.scheduledTime).getUTCMinutes() % 15 === 0
     ctx.waitUntil(

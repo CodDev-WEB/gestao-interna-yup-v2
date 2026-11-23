@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, RotateCw, Search } from 'lucide-react'
 import logo from './assets/logo-yupee.png'
 import { ExportarPagina } from './Exportar'
+import { paginaAtual } from './nav'
 
 /** Logo Yupee + nome do sistema (mesmo padrão do Gestão à Vista). */
 export function Brand() {
@@ -10,12 +11,35 @@ export function Brand() {
 }
 
 /** Cabeçalho de página: trilha, título, descrição e ações. */
+/** Texto explicativo da página: mostra duas linhas e o resto em "ver mais", para o conteúdo aparecer logo. */
+function Explicacao({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLParagraphElement>(null)
+  const [aberto, setAberto] = useState(false)
+  const [longo, setLongo] = useState(false)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const medir = () => setLongo(el.scrollHeight > el.clientHeight + 2 || aberto)
+    medir(); window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+  }, [children, aberto])
+  return (
+    <div className="page-desc">
+      <p ref={ref} className={aberto ? 'aberto' : undefined}>{children}</p>
+      {longo && <button type="button" className="ver-mais" onClick={() => setAberto(a => !a)} aria-expanded={aberto}>{aberto ? 'ver menos' : 'ver mais'}</button>}
+    </div>
+  )
+}
+
 export function PageHead({ section, title, children, actions }: { section?: string; title: string; children?: ReactNode; actions?: ReactNode }) {
+  const { pathname } = useLocation()
+  const grupo = paginaAtual(pathname)?.grupo ?? null
+  const eyebrow = grupo ?? (section && section.toUpperCase() !== title.toUpperCase() ? section : null)
   return (
     <header className="page-head">
-      <div>
+      <div className="page-title">
+        {eyebrow && <span className="page-eyebrow">{eyebrow}</span>}
         <h1>{title}</h1>
-        {children && <p>{children}</p>}
+        {children && <Explicacao>{children}</Explicacao>}
       </div>
       <div className="page-actions">{actions}<ExportarPagina titulo={title} /></div>
     </header>
@@ -63,7 +87,8 @@ export function useParam(name: string, def = ''): [string, (v: string) => void] 
 }
 
 /** sm: false esconde a coluna nos cartões do celular (dado secundário). */
-export type Col<T> = { key: string; label: string; right?: boolean; wrap?: boolean; sort?: boolean; sm?: false; className?: string; render: (r: T) => ReactNode }
+/** extra: coluna secundária, escondida até a pessoa pedir "Mais colunas" (tabela mais limpa). */
+export type Col<T> = { key: string; label: string; right?: boolean; wrap?: boolean; sort?: boolean; sm?: false; extra?: boolean; className?: string; render: (r: T) => ReactNode }
 
 /** Tabela com ordenação e paginação do servidor. No celular, cada linha vira um cartão. */
 export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, dir, onSort, rowKey, caption, busy }: {
@@ -73,6 +98,10 @@ export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, 
   busy?: boolean
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize))
+  const [mais, setMais] = useState(() => { try { return localStorage.getItem('yup.mais-colunas') === '1' } catch { return false } })
+  const extras = cols.filter(c => c.extra).length
+  const alternarMais = () => setMais(m => { try { localStorage.setItem('yup.mais-colunas', m ? '0' : '1') } catch { /* sem storage */ } return !m })
+  cols = mais ? cols : cols.filter(c => !c.extra)
   const sortable = cols.filter(c => c.sort)
   const Arrow = dir === 'asc' ? ArrowUp : ArrowDown
   return (
@@ -85,6 +114,7 @@ export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, 
           <button type="button" className="btn secondary" onClick={() => sort && onSort(sort)} aria-label={dir === 'asc' ? 'Crescente; inverter' : 'Decrescente; inverter'}><Arrow size={16} aria-hidden /></button>
         </label>
       )}
+      {extras > 0 && <div className="mais-colunas"><button type="button" className="chip" aria-pressed={mais} onClick={alternarMais}>{mais ? 'Menos colunas' : `Mais colunas (${extras})`}</button></div>}
       <div className="table-wrap cards-sm" aria-busy={busy || undefined}>
         <table>
           <caption className="sr-only">{caption}</caption>

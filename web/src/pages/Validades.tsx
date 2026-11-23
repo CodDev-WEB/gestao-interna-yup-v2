@@ -42,8 +42,8 @@ export default function Validades() {
           const Icon = [CalendarX, AlertTriangle, Clock, CalendarClock][i]
           return (
             <Metric key={f.id} icon={<Icon size={18} />} tone={n > 0 ? f.tom as 'red' | 'gold' : 'blue'} label={f.nome}
-              value={`${dec(n)} ${n === 1 ? 'unidade' : 'unidades'}`} valueClass={n > 0 ? f.classe : ''}
-              detail={`${int(r(f.id)?.produtos ?? 0)} produtos, ${int(nl)} ${nl === 1 ? 'lote' : 'lotes'} · ${brlCurto(r(f.id)?.valor ?? 0)} a custo · ${dec(r(f.id)?.unidades_em_risco ?? 0)} un. em risco`}
+              value={!res ? '—' : `${dec(n)} ${n === 1 ? 'unidade' : 'unidades'}`} valueClass={n > 0 ? f.classe : ''}
+              detail={!res ? 'carregando…' : `${int(r(f.id)?.produtos ?? 0)} produtos, ${int(nl)} ${nl === 1 ? 'lote' : 'lotes'} · ${brlCurto(r(f.id)?.valor ?? 0)} a custo · ${dec(r(f.id)?.unidades_em_risco ?? 0)} un. em risco`}
               onClick={() => setFx(fx === f.id ? '' : f.id)} pressed={fx === f.id} />
           )
         })}
