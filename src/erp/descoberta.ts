@@ -67,3 +67,15 @@ export async function descobrirAutoria(erp: ErpClient) {
   await tentar('usuario_login', 'SELECT t._idusuario, t.login FROM usuario t', 60)
   return r
 }
+
+/** Tabelas de auditoria/histórico de documentos do ERP: colunas e um exemplo (sem dados sensíveis). */
+export async function descobrirAuditoriaDocs(erp: ErpClient) {
+  const r: Record<string, unknown> = {}
+  const tentar = async (nome: string, sql: string, limite = 100) => {
+    try { assertReadOnly(sql); r[nome] = (await erp.page(sql, 0, limite)).rows.slice(0, limite) }
+    catch (e) { r[nome] = { erro: String(e instanceof Error ? e.message : e).slice(0, 200) } }
+  }
+  await tentar('colunas', "SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_name IN ('documento_historico', 'documento_auditoria', 'documento_mercadoria_historico', 'mercadoria_estoque_lote_historico') ORDER BY table_name, column_name")
+  for (const t of ['documento_historico', 'documento_auditoria', 'documento_mercadoria_historico']) await tentar(t, `SELECT * FROM ${t} t ORDER BY 1 DESC`, 3)
+  return r
+}

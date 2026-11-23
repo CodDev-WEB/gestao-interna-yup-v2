@@ -49,7 +49,7 @@ export function celulas(m: Mov, comProduto: boolean) {
       ? <><b>{brl(m.depois)}</b><small>preço antes {brl(m.antes)}</small></>
       : <><b className={m.quantidade !== null && m.quantidade < 0 ? 'down' : 'up'}>{sinal(m.quantidade)} un.</b><small>saldo {dec(m.antes)} → {dec(m.depois)}</small>{(m.registros ?? 1) > 1 && <small title="O ERP grava um registro por bipe ou alteração; aqui eles aparecem somados.">{m.registros} lançamentos no ERP</small>}</>,
     valor: m.valor !== null ? brl(m.valor) : <span className="muted">—</span>,
-    quem: m.usuario ? <>{m.usuario}{m.vendedora && m.vendedora !== m.usuario && <small>vendedora: {m.vendedora}</small>}</> : <span className="muted">{preco ? 'não informado pelo ERP' : '—'}</span>,
+    quem: m.usuario ? <>{m.usuario}{m.vendedora && m.vendedora !== m.usuario && <small>vendedora: {m.vendedora}</small>}</> : <span className="muted">{preco ? 'ainda não lido do ERP' : '—'}</span>,
   }
 }
 

@@ -71,7 +71,7 @@ select 'p' || t._idhistorico || '-' || t._idtabela,
        'preco', t.datahora, t._idmercadoriavariacao, null, 'preco',
        'Mudança de preço de venda' || case when t._idtabela <> 1 then ' (tabela ' || t._idtabela || ')' else '' end,
        false, t.valprecotual, t.valpreconovo, t.valpreconovo - t.valprecotual,
-       null, null, null, null, null, null, null, null, 1::bigint
+       null, null, t.idusuarioalteracao, nullif(trim(t.nomeusuarioalteracao), ''), null, null, null, null, 1::bigint
   from public.erp_mercadoria_tabela_preco_historico t;
 
 create or replace function public.log_movimentos(p jsonb) returns jsonb
@@ -150,7 +150,7 @@ select 'p' || t._idhistorico || '-' || t._idtabela,
        'preco', t.datahora, t._idmercadoriavariacao, null, 'preco',
        'Mudança de preço de venda' || case when t._idtabela <> 1 then ' (tabela ' || t._idtabela || ')' else '' end,
        false, t.valprecotual, t.valpreconovo, t.valpreconovo - t.valprecotual,
-       null, null, null, null, null, null, null, null, 1::bigint
+       null, null, t.idusuarioalteracao, nullif(trim(t.nomeusuarioalteracao), ''), null, null, null, null, 1::bigint
   from public.erp_mercadoria_tabela_preco_historico t
  where (v is null or t._idmercadoriavariacao = v) and t.datahora >= de and t.datahora < ate),
   f as (

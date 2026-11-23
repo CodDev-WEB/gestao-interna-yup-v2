@@ -361,6 +361,8 @@ create table if not exists public.erp_mercadoria_tabela_preco_historico (
 alter table public.erp_mercadoria_tabela_preco_historico add column if not exists datahora timestamptz;
 alter table public.erp_mercadoria_tabela_preco_historico add column if not exists valprecotual numeric;
 alter table public.erp_mercadoria_tabela_preco_historico add column if not exists valpreconovo numeric;
+alter table public.erp_mercadoria_tabela_preco_historico add column if not exists idusuarioalteracao bigint;
+alter table public.erp_mercadoria_tabela_preco_historico add column if not exists nomeusuarioalteracao text;
 alter table public.erp_mercadoria_tabela_preco_historico enable row level security;
 create index if not exists erp_mercadoria_tabela_preco_historico_seen_idx on public.erp_mercadoria_tabela_preco_historico (sync_seen_at);
 create index if not exists erp_mercadoria_tabela_preco_historico_ix1 on public.erp_mercadoria_tabela_preco_historico (_idmercadoriavariacao, datahora);

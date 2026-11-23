@@ -81,7 +81,7 @@ const C = {
   mercadoria_estoque: cols('_idempresa, _idlocalestoque, _idmercadoriavariacao, qtdsaldo, qtdsaldoreserva, datahora'),
   mercadoria_estoque_lote: cols('_idempresa, _idlocalestoque, _idmercadoriavariacao, _lote, _dtvalidade, _dtentrada, qtdsaldo, datahora, dtfabricacao'),
   mercadoria_tabela_preco: cols('_idempresa, _idmercadoriavariacao, _idtabela, valpreco, valcusto, flaginativo, dtalteracao'),
-  mercadoria_tabela_preco_historico: cols('_idhistorico, _idempresa, _idmercadoriavariacao, _idtabela, datahora, valprecotual, valpreconovo'),
+  mercadoria_tabela_preco_historico: cols('_idhistorico, _idempresa, _idmercadoriavariacao, _idtabela, datahora, valprecotual, valpreconovo, idusuarioalteracao, nomeusuarioalteracao'),
   mercadoria_estoque_historico: cols('_idhistorico, _iddocumento, _idlocalestoque, idmercadoriavariacao, datahora, qtdsaldoatual, qtdnovosaldo'),
   inventario: cols('_idinventario, idempresa, descricao, idlocalestoque, status, datahora, iddocumento, tipofinalidade'),
   inventario_mercadoria: cols('_idinventario, _idsequencia, idmercadoriavariacao, datahora, qtdcontada, qtdanterior, valcusto, valcustomedio, lote, dtvalidade'),
