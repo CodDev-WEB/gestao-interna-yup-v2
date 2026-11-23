@@ -68,7 +68,7 @@ const MODELOS_PRONTOS: Modelo[] = [
   { nome: 'Compras por fornecedor', qs: `fonte=compras&g=fornecedor&m=documentos,qtd,liquido,produtos&ordem=liquido` },
   { nome: 'Devoluções por vendedora', qs: `fonte=devolucoes&g=vendedora&m=documentos,qtd,liquido&ordem=liquido` },
   { nome: 'Estoque por setor', qs: `fonte=estoque&g=setor,secao&m=produtos,qtd,custo&ordem=custo` },
-  { nome: 'Vencidos e a vencer por produto', qs: `fonte=validades&g=faixa,item&m=qtd,custo&ordem=custo&de=2000-01-01&ate=${mais(hoje(), 90)}` },
+  { nome: 'Vencidos e a vencer por produto', qs: `fonte=validades&g=item&m=qtd,custo&de=2000-01-01&ate=${mais(hoje(), 90)}` },
 ]
 const CHAVE_MODELOS = 'yup-relatorios-modelos'
 function lerModelos(): Modelo[] { try { return JSON.parse(localStorage.getItem(CHAVE_MODELOS) || '[]') } catch { return [] } }
@@ -85,7 +85,7 @@ export default function Relatorios() {
   const metricas = (sp.get('m') ?? 'liquido').split(',').filter(m => def.metricas.includes(m))
   const filtros: Record<string, string> = {}
   for (const f of def.filtros) { const v = sp.get(`f_${f}`); if (v) filtros[f] = v }
-  const ordem = sp.get('ordem') ?? '', dir = sp.get('dir') ?? 'desc', limite = sp.get('limite') ?? '1000'
+  const ordem = sp.get('ordem') ?? '', dir = sp.get('dir') ?? (fonte === 'validades' ? 'asc' : 'desc'), limite = sp.get('limite') ?? '1000'
   const set = (k: Record<string, string | null>) => setSp(prev => { const n = new URLSearchParams(prev); for (const [a, b] of Object.entries(k)) b === null || b === '' ? n.delete(a) : n.set(a, b); return n }, { replace: true })
   const nomeMetrica = (m: string) => def.nomes?.[m] ?? METRICAS[m].nome
   const nomeGrupo = (g: string) => def.nomes?.[g] ?? GRUPOS[g]
@@ -111,7 +111,7 @@ export default function Relatorios() {
   }
   useEffect(() => { setRes(null) }, [fonte])
 
-  const colunas: Coluna[] = [...grupos.flatMap(g => colunasDoGrupo(g, fonte)), ...metricas.map(m => ({ chave: m, titulo: nomeMetrica(m), tipo: METRICAS[m].tipo }))]
+  const colunas: Coluna[] = [...grupos.flatMap(g => colunasDoGrupo(g, fonte)), ...(fonte === 'validades' && grupos.length && !grupos.includes('lote') ? [{ chave: 'proxima_validade', titulo: 'Validade mais próxima', tipo: 'data' as Tipo }] : []), ...metricas.map(m => ({ chave: m, titulo: nomeMetrica(m), tipo: METRICAS[m].tipo }))]
     .filter((c, i, a) => a.findIndex(x => x.chave === c.chave) === i)
   const rotulo = (c: Coluna, v: unknown) => c.chave === 'faixa' ? (FAIXAS.find(f => f.id === v)?.nome ?? String(v ?? '—').replace(/_/g, ' ')) : textoCelula(v, c.tipo)
   const linhasFmt: Record<string, unknown>[] = (res?.linhas ?? []).map(l => ({ ...l, faixa: l.faixa !== undefined ? rotulo({ chave: 'faixa', titulo: '', tipo: 'texto' }, l.faixa) : undefined }))
@@ -212,13 +212,13 @@ export default function Relatorios() {
             ))}
             <label>Ordenar por
               <select className="select" value={ordem} onChange={e => set({ ordem: e.target.value })}>
-                <option value="">Automático</option>
+                <option value="">{fonte === 'validades' ? 'Validade (vence primeiro no topo)' : 'Automático'}</option>
                 {metricas.map(m => <option key={m} value={m}>{nomeMetrica(m)}</option>)}
                 {grupos.filter(g => ['dia', 'semana', 'mes', 'ano', 'empresa', 'setor', 'secao', 'faixa'].includes(g)).map(g => <option key={g} value={g}>{nomeGrupo(g)}</option>)}
               </select>
             </label>
             <label>Sentido
-              <select className="select" value={dir} onChange={e => set({ dir: e.target.value })}><option value="desc">Maior para menor</option><option value="asc">Menor para maior</option></select>
+              <select className="select" value={dir} onChange={e => set({ dir: e.target.value })}><option value="desc">{fonte === 'validades' && !ordem ? 'Vence por último primeiro' : 'Maior para menor'}</option><option value="asc">{fonte === 'validades' && !ordem ? 'Vence primeiro no topo' : 'Menor para maior'}</option></select>
             </label>
             <label>Máximo de linhas
               <select className="select" value={limite} onChange={e => set({ limite: e.target.value })}>{['50', '100', '500', '1000', '5000'].map(x => <option key={x}>{x}</option>)}</select>

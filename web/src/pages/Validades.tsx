@@ -34,7 +34,7 @@ export default function Validades() {
   return (
     <>
       <PageHead section="VALIDADES" title="Validades">
-        Unidades realmente disponíveis em estoque e a validade de cada uma, vencendo em até 90 dias. Como o ERP não baixa o lote na venda, o estoque atual do item é repartido entre os lotes, considerando que sai primeiro o que vence primeiro; lote cujas unidades já saíram não aparece. O risco considera a venda média dos últimos 90 dias.
+        Unidades realmente disponíveis em estoque e a validade de cada uma, vencendo em até 90 dias. Como o ERP não baixa o lote na venda, o estoque atual do item é repartido entre os lotes, considerando que sai primeiro o que vence primeiro; lote cujas unidades já saíram não aparece. Ordem: o que vence primeiro aparece primeiro; os já vencidos ficam juntos no fim da lista (ou no cartão Vencido). O risco considera a venda média dos últimos 90 dias.
       </PageHead>
       <div className="metrics" style={{ marginBottom: 18 }}>
         {FAIXAS.slice(0, 4).map((f, i) => {

@@ -141,8 +141,10 @@ function Geral({ f }: { f: Ficha }) {
 
 function Lotes({ f }: { f: Ficha }) {
   const [zerados, setZerados] = useState(false)
-  const ativos = f.lotes.filter(l => l.qtdsaldo > 0)
-  const lista = zerados ? f.lotes : ativos
+  // O que vence primeiro no topo; vencidos juntos depois; lotes que já saíram por último.
+  const ordem = (a: Lote, b: Lote) => Number(a.dias_para_vencer < 0) - Number(b.dias_para_vencer < 0) || a.dias_para_vencer - b.dias_para_vencer || String(a.lote).localeCompare(String(b.lote))
+  const ativos = f.lotes.filter(l => l.qtdsaldo > 0).sort(ordem)
+  const lista = zerados ? [...ativos, ...f.lotes.filter(l => l.qtdsaldo <= 0).sort(ordem)] : ativos
   const qZerados = f.lotes.length - ativos.length
   if (f.lotes.length === 0) return <Empty>Este item não tem lotes registrados no ERP.</Empty>
   return (

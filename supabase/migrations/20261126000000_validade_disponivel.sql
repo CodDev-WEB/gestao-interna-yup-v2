@@ -54,7 +54,8 @@ select a._idempresa as idempresa,
        (a._dtvalidade < hoje.d or coalesce(media.diaria, 0) = 0 or a.ate_aqui / media.diaria > (a._dtvalidade - hoje.d)) as risco_perda,
        a.qtdsaldo as qtd_lote,
        a.estoque_item,
-       a.qtdsaldo - a.disponivel as qtd_ja_saiu
+       a.qtdsaldo - a.disponivel as qtd_ja_saiu,
+       (a._dtvalidade < hoje.d) as vencido
   from acum a
   cross join hoje
   left join public.vw_variacao_nome n on n.idmercadoriavariacao = a._idmercadoriavariacao

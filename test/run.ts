@@ -442,6 +442,7 @@ await test('validade pelo disponível: estoque repartido entre os lotes, o que v
     const rows = (await sb.query<{ lote: string; qtdsaldo: string; qtd_lote: string; qtd_ja_saiu: string }>(`select lote, qtdsaldo::text, qtd_lote::text, qtd_ja_saiu::text from vw_lote_disponivel where idmercadoriavariacao = 777 order by lote`)).rows
     assert.deepEqual(rows.map(r => [r.lote, Number(r.qtdsaldo), Number(r.qtd_ja_saiu)]), [['A', 2, 8], ['B', 3, 0]], 'lote vencido já saiu; o de validade mais longa fica inteiro')
     assert.equal(await count(sb, `select count(*) as n from vw_lote_validade where idmercadoriavariacao = 777`), 2)
+    assert.deepEqual((await sb.query<{ lote: string }>(`select lote from vw_lote_disponivel where idmercadoriavariacao = 777 order by vencido, dias_para_vencer`)).rows.map(r => r.lote), ['A', 'B'])
     const soma = await one<{ s: string }>(`select sum(qtdsaldo)::text as s from vw_lote_validade where idmercadoriavariacao = 777`)
     assert.equal(Number(soma.s), 5, 'nunca mais que o estoque')
     await sb.exec(`update erp_mercadoria_estoque set qtdsaldo = 0 where _idmercadoriavariacao = 777`)
@@ -466,6 +467,9 @@ await test('relatório montado: agrupa, soma ao centavo, filtra e recusa o que n
   const filtrado = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['empresa'], metricas: ['liquido'], filtros: { empresa: 2 } })
   assert.ok(filtrado.linhas.every((l: any) => Number(l.empresa) === 2))
   for (const fonte of ['compras', 'devolucoes', 'estoque', 'validades']) await rel({ fonte, de: day(-400), ate: day(400), grupos: ['setor'], metricas: ['qtd', 'custo'] })
+  const val = await rel({ fonte: 'validades', de: day(-400), ate: day(400), grupos: ['item'], metricas: ['qtd'] })
+  const chaves = val.linhas.map((l: any) => [l.proxima_validade < today ? 1 : 0, l.proxima_validade])
+  assert.deepEqual(chaves, [...chaves].sort((a: any, b: any) => a[0] - b[0] || String(a[1]).localeCompare(String(b[1]))), 'validades: vence primeiro no topo, vencidos no fim')
   await assert.rejects(rel({ fonte: 'vendas', grupos: ['x; drop table erp_documento'], metricas: ['liquido'] }), /Agrupamento inválido/)
   await assert.rejects(rel({ fonte: 'vendas', metricas: ['sum(1)'] }), /Métrica inválida/)
   const busca = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['item'], metricas: ['liquido'], filtros: { produto: "a'; select 1 --" } })

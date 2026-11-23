@@ -194,7 +194,15 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       const limit = int(q.get('limit'), 50, 1, 200), offset = int(q.get('offset'), 0, 0, 1_000_000)
       const faixa = pick(q.get('faixa'), FAIXAS), s = busca(q.get('busca'))
       const filtro = (faixa ? `&faixa=eq.${faixa}` : '&faixa=neq.normal') + (q.get('risco') === '1' ? '&risco_perda=is.true' : '') + (s ? ilike('descricao', s) : '')
-      return db.selectPage('vw_lote_disponivel', `select=*${filtro}${order(q.get('ordem'), ['dias_para_vencer', 'valor_em_risco', 'qtdsaldo'], 'dias_para_vencer', q.get('dir') ?? 'asc')}`, limit, offset)
+      // Ordem: o que vence primeiro no topo e os vencidos juntos no fim; empate fica agrupado por produto e lote.
+      // Ordenando por valor ou unidades, o desempate continua sendo a validade.
+      const col = pick(q.get('ordem'), ['dias_para_vencer', 'valor_em_risco', 'qtdsaldo']) ?? 'dias_para_vencer'
+      const sentido = q.get('dir') === 'desc' ? 'desc' : 'asc'
+      const ordem = col === 'dias_para_vencer'
+        ? `&order=vencido.${sentido === 'asc' ? 'asc' : 'desc'},dias_para_vencer.${sentido},descricao.asc,lote.asc`
+        : `&order=${col}.${q.get('dir') === 'asc' ? 'asc' : 'desc'}.nullslast,vencido.asc,dias_para_vencer.asc,descricao.asc`
+      return db.selectPage('vw_lote_disponivel', `select=*${filtro}${ordem}`, limit, offset)
+        .catch(e => { if (e instanceof SupabaseError && /vencido/.test(e.message)) return db.selectPage('vw_lote_disponivel', `select=*${filtro}&order=dias_para_vencer.asc,descricao.asc`, limit, offset); throw e })
     }
 
     case 'lotes-resumo':
