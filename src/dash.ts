@@ -348,13 +348,21 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
   throw new DashError('Consulta desconhecida.')
 }
 
+/** A classificação dos produtos é pronta (mv_produto_classe): refaz na hora para a regra salva valer já. */
+async function atualizarClasse(db: Supabase) {
+  await db.rpc('atualizar_classe', {}).catch(e => { if (!(e instanceof SupabaseError && /atualizar_classe|PGRST202/.test(e.message))) throw e })
+}
+
 /** Cria, altera ou remove ({"prefixo", "setor": null}) uma regra de setor por prefixo de NCM. */
 export async function salvarRegraNcm(db: Supabase, body: Record<string, unknown>) {
   const p = typeof body.prefixo === 'string' ? body.prefixo.replace(/\D/g, '') : ''
   if (!/^\d{2,8}$/.test(p)) throw new DashError('"prefixo" precisa ter de 2 a 8 dígitos do NCM.')
-  if (body.setor === null) { await db.deleteWhere('cfg_ncm_setor', `prefixo=eq.${p}`); return { ok: true } }
-  if (typeof body.setor !== 'string' || !SETORES.includes(body.setor)) throw new DashError(`"setor" precisa ser um de: ${SETORES.join(', ')} (ou null).`)
-  await db.upsert('cfg_ncm_setor', [{ prefixo: p, setor: body.setor }], 'prefixo')
+  if (body.setor === null) await db.deleteWhere('cfg_ncm_setor', `prefixo=eq.${p}`)
+  else {
+    if (typeof body.setor !== 'string' || !SETORES.includes(body.setor)) throw new DashError(`"setor" precisa ser um de: ${SETORES.join(', ')} (ou null).`)
+    await db.upsert('cfg_ncm_setor', [{ prefixo: p, setor: body.setor }], 'prefixo')
+  }
+  await atualizarClasse(db)
   return { ok: true }
 }
 
@@ -362,9 +370,12 @@ export async function salvarRegraNcm(db: Supabase, body: Record<string, unknown>
 export async function salvarSecao(db: Supabase, body: Record<string, unknown>) {
   const id = body.idsecao
   if (!Number.isSafeInteger(id)) throw new DashError('"idsecao" inválido.')
-  if (body.setor === null) { await db.deleteWhere('cfg_secao_setor', `idsecao=eq.${id}`); return { ok: true } }
-  if (typeof body.setor !== 'string' || !SETORES.includes(body.setor)) throw new DashError(`"setor" precisa ser um de: ${SETORES.join(', ')} (ou null).`)
-  await db.upsert('cfg_secao_setor', [{ idsecao: id, setor: body.setor }], 'idsecao')
+  if (body.setor === null) await db.deleteWhere('cfg_secao_setor', `idsecao=eq.${id}`)
+  else {
+    if (typeof body.setor !== 'string' || !SETORES.includes(body.setor)) throw new DashError(`"setor" precisa ser um de: ${SETORES.join(', ')} (ou null).`)
+    await db.upsert('cfg_secao_setor', [{ idsecao: id, setor: body.setor }], 'idsecao')
+  }
+  await atualizarClasse(db)
   return { ok: true }
 }
 

@@ -237,6 +237,7 @@ async function settle(clock: Date, label: string) {
     if (r.message === 'Nada a sincronizar agora.') break
     assert.ok(runs < 200, `${label}: não estabilizou`)
   }
+  await sb.query('select atualizar_gestao()') // como o cron do Worker faz depois da sincronização
   return { runs, requests: api.requests }
 }
 
@@ -342,9 +343,9 @@ await test('classificação por NCM: regra do NCM (prefixo mais longo) > seção
   assert.equal(c[100].setor, 'Alimentação'); assert.equal(c[100].origem_setor, 'ncm'); assert.equal(c[100].ncm_descricao, 'ALIMENTOS PARA CAES E GATOS')
   assert.equal(c[110].setor, 'Farmácia'); assert.equal(c[110].origem_setor, 'ncm')
   // Regra mais específica vence a do capítulo.
-  await sb.exec(`insert into cfg_ncm_setor (prefixo, setor) values ('230910', 'Diversos')`)
+  await sb.exec(`insert into cfg_ncm_setor (prefixo, setor) values ('230910', 'Diversos')`); await sb.query('select atualizar_classe()')
   assert.equal((await one<{ setor: string }>('select setor from vw_produto_classe where idmercadoriavariacao = 100')).setor, 'Diversos')
-  await sb.exec(`delete from cfg_ncm_setor where prefixo = '230910'`)
+  await sb.exec(`delete from cfg_ncm_setor where prefixo = '230910'`); await sb.query('select atualizar_classe()')
   // Sem regra de NCM: vale a seção; sem regra de seção: Diversos (tem NCM).
   const semRegra = c[130]
   assert.ok(['secao', 'padrao'].includes(semRegra.origem_setor)); assert.equal(semRegra.posicao, '2508')
