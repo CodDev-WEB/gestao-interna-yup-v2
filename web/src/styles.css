@@ -1200,3 +1200,7 @@ td.money { font-weight: 600; }
 .menu-titulo { font-weight: 600; }
 .eyebrow { font-weight: 600; font-size: 11px; letter-spacing: 0.06em; }
 .hint, .muted { font-size: 12px; }
+@media (max-width: 760px) {
+  html, body { font-size: 14px; }
+  .input, .select, .topbar-busca .input { font-size: 16px; }
+}
