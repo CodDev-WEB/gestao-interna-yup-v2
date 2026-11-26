@@ -300,6 +300,35 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       return r
     }
 
+    // Ficha do mês de um cliente: cada produto que ele comprou no mês, com quantidade, valores e os dias da compra.
+    case 'cliente-mes': {
+      const id = q.get('id'), mes = q.get('mes')
+      if (!id || !/^\d{1,12}$/.test(id)) throw new DashError('Informe o id do cliente.')
+      if (!mes || !/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) throw new DashError('Informe o mês (AAAA-MM).')
+      const [y, m] = mes.split('-').map(Number)
+      const ate = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
+      const r = await db.rpc<{ linhas: Record<string, unknown>[]; totais: Record<string, unknown>; limitado?: boolean }>('relatorio', { p: {
+        fonte: 'vendas', de: `${mes}-01`, ate, grupos: ['item', 'dia'], metricas: ['qtd', 'bruto', 'desconto', 'liquido', 'lucro', 'documentos'], filtros: { cliente: Number(id) }, ordem: 'liquido', limite: 5000 } })
+      type P = { id: number; nome: string; qtd: number; bruto: number; desconto: number; liquido: number; lucro: number; compras: number; dias: string[] }
+      const itens = new Map<number, P>()
+      for (const l of r.linhas) {
+        const k = Number(l.variacao)
+        const it = itens.get(k) ?? { id: k, nome: String(l.produto ?? `Item ${k}`), qtd: 0, bruto: 0, desconto: 0, liquido: 0, lucro: 0, compras: 0, dias: [] }
+        it.qtd += n(l.qtd as Num); it.bruto += n(l.bruto as Num); it.desconto += n(l.desconto as Num); it.liquido += n(l.liquido as Num); it.lucro += n(l.lucro as Num); it.compras += n(l.documentos as Num)
+        if (!it.dias.includes(String(l.dia))) it.dias.push(String(l.dia))
+        itens.set(k, it)
+      }
+      const c2 = (x: number) => Math.round(x * 100) / 100
+      const produtos = [...itens.values()].map(i => ({ ...i, qtd: Math.round(i.qtd * 1000) / 1000, bruto: c2(i.bruto), desconto: c2(i.desconto), liquido: c2(i.liquido), lucro: c2(i.lucro), dias: i.dias.sort() }))
+        .sort((a, b) => b.liquido - a.liquido)
+      return { mes, de: `${mes}-01`, ate, totais: r.totais, produtos }
+    }
+    // O que a descoberta achou no ERP sobre caixa e formas de pagamento (base da conferência de caixa).
+    case 'erp-caixa': {
+      const [run] = await db.select<Record<string, unknown>>('sync_runs', 'dataset=eq.erp_caixa&select=started_at,details&order=started_at.desc&limit=1')
+      return run ?? null
+    }
+
     case 'clientes-segmentos': {
       const contagens = await Promise.all(SEGMENTOS.map(async sgm => [sgm, await db.count('vw_cliente_rfm', `segmento=eq.${sgm}`)] as const))
       return Object.fromEntries(contagens)

@@ -27,6 +27,7 @@ import Auditoria from './pages/Auditoria'
 import Relatorios from './pages/Relatorios'
 import LogMovimentacoes from './pages/LogMovimentacoes'
 import Mix from './pages/Mix'
+import Caixa from './pages/Caixa'
 
 import { GRUPOS, dentroDe, paginaAtual, type ItemNav } from './nav'
 
@@ -215,6 +216,7 @@ function App() {
           <Route path="/setores/categorias" element={<SetoresCategorias />} />
           <Route path="/setores/regras" element={<SetoresRegras />} />
           <Route path="/setores/secoes" element={<SetoresSecoes />} />
+          <Route path="/caixa" element={<Caixa />} />
           <Route path="/sincronizacao" element={<Sincronizacao />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
