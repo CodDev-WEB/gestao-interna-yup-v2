@@ -8,12 +8,11 @@ import { type Col, DataTable, Empty, ErrorState, Loading, PageHead, SearchBox, T
 type Forn = { idfornecedor: number; nome: string | null; total_comprado: number | string; compras: number; ticket_medio: number | string; skus: number; primeira_compra: string; ultima_compra: string; participacao_pct: number | string }
 type Preco = { idfornecedor: number; idmercadoriavariacao: number; descricao: string | null; compras: number; menor_preco: number | string; maior_preco: number | string; preco_medio_ponderado: number | string; ultimo_preco: number | string; penultimo_preco: number | string | null; variacao_ultima_pct: number | string | null; ultima_compra: string }
 
-const PAGE = 50
 
 function Resumo() {
   const [busca, setBusca] = useParam('busca')
   const t = useTableState('total_comprado')
-  const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
+  const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), ordem: t.sort, dir: t.dir })
   if (busca) qs.set('busca', busca)
   const { data: p, error, loading, reload } = useApi<Page<Forn>>(`dash/fornecedores?${qs}`)
   const cols: Col<Forn>[] = [
@@ -29,7 +28,7 @@ function Resumo() {
     <>
       <div className="controls"><SearchBox value={busca} onChange={setBusca} placeholder="Buscar fornecedor" /></div>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhuma compra encontrada.</Empty> : (
-        <DataTable busy={loading} caption="Fornecedores" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={f => String(f.idfornecedor)} />
+        <DataTable busy={loading} caption="Fornecedores" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={f => String(f.idfornecedor)} />
       )}
     </>
   )
@@ -39,7 +38,7 @@ function Precos() {
   const [min, setMin] = useParam('min')
   const [forn, setForn] = useParam('fornecedor')
   const t = useTableState('variacao_ultima_pct')
-  const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
+  const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), ordem: t.sort, dir: t.dir })
   if (min) qs.set('min', min); if (forn) qs.set('fornecedor', forn)
   const { data: p, error, loading, reload } = useApi<Page<Preco>>(`dash/precos?${qs}`)
   const cols: Col<Preco>[] = [
@@ -63,7 +62,7 @@ function Precos() {
       </div>
       <p className="hint">Preço unitário de compra (total do item ÷ quantidade). Variação compara a última compra com a anterior do mesmo fornecedor.</p>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum item com esses filtros.</Empty> : (
-        <DataTable busy={loading} caption="Preços de compra" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={x => `${x.idfornecedor}-${x.idmercadoriavariacao}`} />
+        <DataTable busy={loading} caption="Preços de compra" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={x => `${x.idfornecedor}-${x.idmercadoriavariacao}`} />
       )}
     </>
   )

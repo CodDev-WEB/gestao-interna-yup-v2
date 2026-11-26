@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AlertTriangle, ArrowDownUp, CalendarX, ChevronRight, Hourglass, PackageMinus, Percent, Receipt, TrendingDown, TrendingUp, UserMinus, Wallet, Wrench } from 'lucide-react'
 import { useApi } from '../api'
-import { brl, brl0, brlCurto, dataCurta, data as fmtData, haQuanto, int, pct, variacao } from '../format'
+import { brl, brlCurto, data as fmtData, dataCurta, haQuanto, int, pct, variacao } from '../format'
 import { SITUACOES } from '../labels'
 import { ErrorState, Loading, Metric, Tabs, useParam } from '../ui'
 
@@ -66,11 +66,11 @@ export default function Resumo() {
 
   // Sugestões: o que fazer, em ordem do dinheiro envolvido (contagens depois).
   const sugestoes: Sugestao[] = ([
-    !semVendas && parado > 0 && { id: 'parado', titulo: 'Liberar capital parado', texto: `${int(qtdDe('parado') + qtdDe('sem_saida_historica'))} produtos sem venda há mais de 90 dias, ou que nunca venderam. Suspenda a recompra e avalie uma promoção.`, valor: brlCurto(parado), sub: 'a custo', to: '/produtos?situacao=parado', sev: 'alta', icon: PackageMinus, peso: parado,
-      frase: <><Link to="/produtos?situacao=parado">{brlCurto(parado)}</Link> estão parados em produtos sem venda.</> },
-    !semVendas && lotesRisco > 0 && { id: 'lotes', titulo: 'Dar saída aos lotes que vencem antes de vender', texto: `${int(qtdLotesRisco)} ${qtdLotesRisco === 1 ? 'lote não vende' : 'lotes não vendem'} antes da validade no ritmo atual. Priorize os mais antigos.`, valor: brlCurto(lotesRisco), sub: 'em risco', to: '/validades?risco=1', sev: 'alta', icon: CalendarX, peso: lotesRisco,
-      frase: <><Link to="/validades?risco=1">{int(qtdLotesRisco)} lotes</Link> não vendem antes de vencer, com {brlCurto(lotesRisco)} em risco.</> },
-    !semVendas && valorDe('excesso_estoque') > 0 && { id: 'excesso', titulo: 'Reduzir pedidos de itens em excesso', texto: `${int(qtdDe('excesso_estoque'))} produtos têm estoque para mais de 120 dias de venda.`, valor: brlCurto(valorDe('excesso_estoque')), sub: 'a custo', to: '/produtos?situacao=excesso_estoque', sev: 'media', icon: ArrowDownUp, peso: valorDe('excesso_estoque'),
+    !semVendas && parado > 0 && { id: 'parado', titulo: 'Liberar capital parado', texto: `${int(qtdDe('parado') + qtdDe('sem_saida_historica'))} produtos sem venda há mais de 90 dias, ou que nunca venderam. Suspenda a recompra e avalie uma promoção.`, valor: brl(parado), sub: 'a custo', to: '/produtos?situacao=parado', sev: 'alta', icon: PackageMinus, peso: parado,
+      frase: <><Link to="/produtos?situacao=parado">{brl(parado)}</Link> estão parados em produtos sem venda.</> },
+    !semVendas && lotesRisco > 0 && { id: 'lotes', titulo: 'Dar saída aos lotes que vencem antes de vender', texto: `${int(qtdLotesRisco)} ${qtdLotesRisco === 1 ? 'lote não vende' : 'lotes não vendem'} antes da validade no ritmo atual. Priorize os mais antigos.`, valor: brl(lotesRisco), sub: 'em risco', to: '/validades?risco=1', sev: 'alta', icon: CalendarX, peso: lotesRisco,
+      frase: <><Link to="/validades?risco=1">{int(qtdLotesRisco)} lotes</Link> não vendem antes de vencer, com {brl(lotesRisco)} em risco.</> },
+    !semVendas && valorDe('excesso_estoque') > 0 && { id: 'excesso', titulo: 'Reduzir pedidos de itens em excesso', texto: `${int(qtdDe('excesso_estoque'))} produtos têm estoque para mais de 120 dias de venda.`, valor: brl(valorDe('excesso_estoque')), sub: 'a custo', to: '/produtos?situacao=excesso_estoque', sev: 'media', icon: ArrowDownUp, peso: valorDe('excesso_estoque'),
       frase: <>{int(qtdDe('excesso_estoque'))} produtos têm <Link to="/produtos?situacao=excesso_estoque">estoque para mais de 4 meses</Link>.</> },
     !semVendas && qtdDe('ruptura') > 0 && { id: 'ruptura', titulo: 'Repor produtos em ruptura', texto: 'Venderam nos últimos 30 dias e estão zerados: cada dia sem estoque é venda perdida.', valor: int(qtdDe('ruptura')), sub: 'produtos', to: '/produtos?situacao=ruptura', sev: 'alta', icon: AlertTriangle, peso: qtdDe('ruptura') * 100,
       frase: <><Link to="/produtos?situacao=ruptura">{int(qtdDe('ruptura'))} produtos</Link> que vendiam estão zerados.</> },
@@ -99,13 +99,13 @@ export default function Resumo() {
         <h1 id="brief-h" className="brief-text">
           <span className="s">
             {incompleta && um
-              ? <>Em <Link to={`/mes?mes=${um.mes}`}>{mesLongo(um.mes)}</Link>, o último mês com as vendas já carregadas, a Yup faturou {brlCurto(Number(um.kpis.faturamento_liquido))} em {int(um.kpis.vendas)} vendas{um.kpis.margem_pct !== null && Number(um.kpis.lucro) !== 0 ? <>, com margem de {pct(um.kpis.margem_pct, 0)}</> : null}.</>
+              ? <>Em <Link to={`/mes?mes=${um.mes}`}>{mesLongo(um.mes)}</Link>, o último mês com as vendas já carregadas, a Yup faturou {brl(Number(um.kpis.faturamento_liquido))} em {int(um.kpis.vendas)} vendas{um.kpis.margem_pct !== null && Number(um.kpis.lucro) !== 0 ? <>, com margem de {pct(um.kpis.margem_pct, 0)}</> : null}.</>
               : semVendas
               ? <>As vendas ainda estão chegando do ERP. O estoque já está completo.</>
-              : <>Nos últimos {r.periodo.dias} dias a Yup faturou <Link to="/mes">{brlCurto(a.faturamento)}</Link>{varFat !== null && <>, {pct(Math.abs(varFat), 0)} {varFat >= 0 ? 'acima' : 'abaixo'} do período anterior</>}{a.margem !== null && <>, com margem de {pct(a.margem, 0)}</>}.</>}
+              : <>Nos últimos {r.periodo.dias} dias a Yup faturou <Link to="/mes">{brl(a.faturamento)}</Link>{varFat !== null && <>, {pct(Math.abs(varFat), 0)} {varFat >= 0 ? 'acima' : 'abaixo'} do período anterior</>}{a.margem !== null && <>, com margem de {pct(a.margem, 0)}</>}.</>}
           </span>
           <span className="s">
-            Há <Link to="/produtos">{brlCurto(totalCapital)}</Link> em estoque a custo{!semVendas && paradoOuExcesso > 0 ? <>, {pct(paradoOuExcesso / totalCapital * 100, 0)} dele parado ou em excesso</> : null}.
+            Há <Link to="/produtos">{brl(totalCapital)}</Link> em estoque a custo{!semVendas && paradoOuExcesso > 0 ? <>, {pct(paradoOuExcesso / totalCapital * 100, 0)} dele parado ou em excesso</> : null}.
           </span>
           {principal && <span className="s">{principal.frase}</span>}
         </h1>
@@ -118,8 +118,8 @@ export default function Resumo() {
 
       <section aria-label="Indicadores do período">
         <div className="metrics">
-          <Metric icon={<Wallet size={18} />} tone="gold" label="Faturamento líquido" value={semVendas ? '—' : brlCurto(a.faturamento)} detail={<Delta atual={a.faturamento} anterior={b.faturamento} semVendas={semVendas} />} />
-          <Metric icon={<TrendingUp size={18} />} tone="green" label="Lucro bruto" value={semVendas ? '—' : brlCurto(a.lucro)} detail={<Delta atual={a.lucro} anterior={b.lucro} semVendas={semVendas} />} />
+          <Metric icon={<Wallet size={18} />} tone="gold" label="Faturamento líquido" value={semVendas ? '—' : brl(a.faturamento)} detail={<Delta atual={a.faturamento} anterior={b.faturamento} semVendas={semVendas} />} />
+          <Metric icon={<TrendingUp size={18} />} tone="green" label="Lucro bruto" value={semVendas ? '—' : brl(a.lucro)} detail={<Delta atual={a.lucro} anterior={b.lucro} semVendas={semVendas} />} />
           <Metric icon={<Percent size={18} />} tone="blue" label="Margem bruta" value={pct(a.margem)} detail={<Delta atual={a.margem} anterior={b.margem} pontos semVendas={semVendas} />} />
           <Metric icon={<Receipt size={18} />} tone="purple" label="Ticket médio" value={brl(a.ticket)} detail={<Delta atual={a.ticket} anterior={b.ticket} semVendas={semVendas} />} />
         </div>
@@ -148,7 +148,7 @@ export default function Resumo() {
         <section aria-labelledby="est-h">
           <div className="group-title"><h2 id="est-h">Estoque</h2><span>a custo</span></div>
           <div className="panel quiet">
-            <div className="big">{totalCapital > 0 ? brl0(totalCapital) : '—'}</div>
+            <div className="big">{totalCapital > 0 ? brl(totalCapital) : '—'}</div>
             {semVendas
               ? <p className="hint" style={{ margin: 0 }}>A divisão entre saudável, parado, excesso e ruptura depende do histórico de vendas, que ainda está chegando do ERP.</p>
               : totalCapital > 0 && <div className="stock-bar" role="img" aria-label="Divisão do estoque por situação">
@@ -162,7 +162,7 @@ export default function Resumo() {
                   <Link className="row" to={`/produtos?situacao=${c.id}`} title={c.desc}>
                     <span className="row-icon" style={{ background: c.cor }} aria-hidden />
                     <span className="row-main"><strong>{c.nome}</strong><span>{int(c.produtos)} produtos</span></span>
-                    <span className="row-val">{brlCurto(c.valor)}<small>{totalCapital ? pct(c.valor / totalCapital * 100, 0) : ''}</small></span>
+                    <span className="row-val">{brl(c.valor)}<small>{totalCapital ? pct(c.valor / totalCapital * 100, 0) : ''}</small></span>
                     <ChevronRight size={16} className="row-chev" aria-hidden />
                   </Link>
                 </li>

@@ -164,16 +164,16 @@ export default function Mes() {
       )}
 
       <div className="metrics">
-        <Metric icon={<Wallet size={18} />} tone="gold" label="Faturamento líquido" value={brlCurto(k.faturamento_liquido)} detail={<><Var atual={k.faturamento_liquido} base={a.faturamento_liquido} /> vs. mês anterior</>} />
-        <Metric icon={<TrendingUp size={18} />} tone="green" label="Lucro bruto" value={brlCurto(k.lucro)} detail={<>margem {pct(k.margem_pct)} · <Var atual={k.margem_pct} base={a.margem_pct} pontos /></>} />
+        <Metric icon={<Wallet size={18} />} tone="gold" label="Faturamento líquido" value={brl(k.faturamento_liquido)} detail={<><Var atual={k.faturamento_liquido} base={a.faturamento_liquido} /> vs. mês anterior</>} />
+        <Metric icon={<TrendingUp size={18} />} tone="green" label="Lucro bruto" value={brl(k.lucro)} detail={<>margem {pct(k.margem_pct)} · <Var atual={k.margem_pct} base={a.margem_pct} pontos /></>} />
         <Metric icon={<Receipt size={18} />} tone="purple" label="Vendas" value={int(k.vendas)} detail={<>ticket médio {brl(k.ticket_medio)} · {dec(k.itens_por_venda)} itens/venda</>} />
         <Metric icon={<Users size={18} />} tone="blue" label="Clientes atendidos" value={int(k.clientes)} detail={<>{int(r.clientes_novos)} novos · {pct(k.pct_vendas_identificadas)} das vendas com cliente</>} />
       </div>
       <div className="metrics" style={{ marginTop: 12 }}>
-        <Metric icon={<PackagePlus size={18} />} tone="turquoise" label="Entrou no estoque" value={brlCurto(k.compras)} detail={<>{int(k.notas_compra)} notas · {int(k.fornecedores)} fornecedores · <Var atual={k.compras} base={a.compras} /></>} />
+        <Metric icon={<PackagePlus size={18} />} tone="turquoise" label="Entrou no estoque" value={brl(k.compras)} detail={<>{int(k.notas_compra)} notas · {int(k.fornecedores)} fornecedores · <Var atual={k.compras} base={a.compras} /></>} />
         <Metric icon={<ArrowLeftRight size={18} />} tone="blue" label="Reposição" value={pct(k.compras_sobre_custo_pct)}
           detail={k.compras_sobre_custo_pct === null ? 'sem custo vendido para comparar' : k.compras_sobre_custo_pct > 110 ? 'comprou mais do que vendeu: estoque crescendo' : k.compras_sobre_custo_pct < 90 ? 'comprou menos do que vendeu: estoque diminuindo' : 'comprou perto do que vendeu'} />
-        <Metric icon={<BadgePercent size={18} />} tone="gold" label="Descontos" value={pct(k.pct_desconto)} detail={`${brl(k.descontos)} sobre ${brlCurto(k.faturamento_bruto)} bruto`} />
+        <Metric icon={<BadgePercent size={18} />} tone="gold" label="Descontos" value={pct(k.pct_desconto)} detail={`${brl(k.descontos)} sobre ${brl(k.faturamento_bruto)} bruto`} />
         <Metric icon={<Undo2 size={18} />} tone={k.pct_devolucao && k.pct_devolucao > 3 ? 'red' : 'purple'} label="Devoluções" value={pct(k.pct_devolucao)} detail={`${brl(k.devolucoes)} em ${int(k.qtd_devolucoes)} devoluções`} />
       </div>
       {k.itens_sem_custo > 0 && <p className="hint" style={{ marginTop: 10 }}>{int(k.itens_sem_custo)} itens vendidos no mês não têm custo no ERP: ficam fora da margem e do lucro.</p>}

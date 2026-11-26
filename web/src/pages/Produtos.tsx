@@ -14,7 +14,6 @@ type Produto = {
 }
 type Declinio = { idmercadoriavariacao: number; descricao: string | null; qtd_3_meses_atras: number | string; qtd_2_meses_atras: number | string; qtd_mes_passado: number | string; variacao_pct: number | string | null; estoque_atual: number | string }
 
-const PAGE = 50
 
 function Lista() {
   const [sit, setSit] = useParam('situacao')
@@ -22,7 +21,7 @@ function Lista() {
   const [busca, setBusca] = useParam('busca')
   const [ncm, setNcm] = useParam('ncm')
   const t = useTableState('valor_estoque')
-  const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
+  const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), ordem: t.sort, dir: t.dir })
   if (sit) qs.set('situacao', sit); if (setor) qs.set('setor', setor); if (busca) qs.set('busca', busca); if (ncm) qs.set('ncm', ncm)
   const { data: p, error, loading, reload } = useApi<Page<Produto>>(`dash/produtos?${qs}`)
   const s = sit ? situacao(sit) : null
@@ -60,7 +59,7 @@ function Lista() {
       </div>
       {s && <p className="hint"><strong>{s.nome}:</strong> {s.desc}.</p>}
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum produto com esses filtros.</Empty> : (
-        <DataTable busy={loading} caption="Produtos" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={r => String(r.idmercadoriavariacao)} />
+        <DataTable busy={loading} caption="Produtos" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={r => String(r.idmercadoriavariacao)} />
       )}
       {loading && p && <span className="sr-only" aria-live="polite">Atualizando</span>}
     </>
@@ -69,7 +68,7 @@ function Lista() {
 
 function Declinio() {
   const t = useTableState('qtd_3_meses_atras')
-  const { data: p, error, loading, reload } = useApi<Page<Declinio>>(`dash/declinio?limit=${PAGE}&offset=${(t.page - 1) * PAGE}`)
+  const { data: p, error, loading, reload } = useApi<Page<Declinio>>(`dash/declinio?limit=${t.pageSize}&offset=${(t.page - 1) * t.pageSize}`)
   const cols: Col<Declinio>[] = [
     { key: 'descricao', label: 'Produto', wrap: true, render: r => <ItemLink id={r.idmercadoriavariacao}>{r.descricao || `Variação ${r.idmercadoriavariacao}`}</ItemLink> },
     { key: 'm3', label: 'Há 3 meses', right: true, render: r => dec(r.qtd_3_meses_atras) },
@@ -82,7 +81,7 @@ function Declinio() {
     <>
       <p className="hint">Unidades vendidas em cada um dos últimos 3 meses fechados, só produtos com queda mês a mês. Estoque zerado indica que a queda pode ser falta de produto, não de procura.</p>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum produto com queda nos últimos 3 meses.</Empty> : (
-        <DataTable busy={loading} caption="Produtos em declínio" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} rowKey={r => String(r.idmercadoriavariacao)} />
+        <DataTable busy={loading} caption="Produtos em declínio" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} rowKey={r => String(r.idmercadoriavariacao)} />
       )}
     </>
   )

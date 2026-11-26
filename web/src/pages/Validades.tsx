@@ -1,5 +1,5 @@
 import { type Page, useApi } from '../api'
-import { brl, brlCurto, data, dec, int } from '../format'
+import { brl, data, dec, int } from '../format'
 import { FAIXAS, faixa } from '../labels'
 import { AlertTriangle, CalendarClock, CalendarX, Clock } from 'lucide-react'
 import { ItemLink } from '../ProdutoPainel'
@@ -8,14 +8,13 @@ import { type Col, DataTable, Empty, ErrorState, Loading, Metric, PageHead, Sear
 type Lote = { idmercadoriavariacao: number; descricao: string | null; lote: string; dtvalidade: string; qtdsaldo: number | string; dias_para_vencer: number; faixa: string; valor_em_risco: number | string | null; venda_media_diaria: number | string | null; dias_para_vender: number | string | null; risco_perda: boolean; idlocalestoque: number; dtentrada: string; qtd_lote?: number | string; estoque_item?: number | string; qtd_ja_saiu?: number | string }
 type Resumo = { faixa: string; lotes: number; valor: number | string; lotes_em_risco: number; valor_em_risco: number | string | null; unidades?: number | string; unidades_em_risco?: number | string; produtos?: number }
 
-const PAGE = 50
 
 export default function Validades() {
   const [fx, setFx] = useParam('faixa')
   const [risco, setRisco] = useParam('risco')
   const [busca, setBusca] = useParam('busca')
   const t = useTableState('dias_para_vencer', 'asc')
-  const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
+  const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), ordem: t.sort, dir: t.dir })
   if (fx) qs.set('faixa', fx); if (risco) qs.set('risco', '1'); if (busca) qs.set('busca', busca)
   const { data: p, error, loading, reload } = useApi<Page<Lote>>(`dash/lotes?${qs}`)
   const { data: res } = useApi<Resumo[]>('dash/lotes-resumo')
@@ -43,7 +42,7 @@ export default function Validades() {
           return (
             <Metric key={f.id} icon={<Icon size={18} />} tone={n > 0 ? f.tom as 'red' | 'gold' : 'blue'} label={f.nome}
               value={!res ? '—' : `${dec(n)} ${n === 1 ? 'unidade' : 'unidades'}`} valueClass={n > 0 ? f.classe : ''}
-              detail={!res ? 'carregando…' : `${int(r(f.id)?.produtos ?? 0)} produtos, ${int(nl)} ${nl === 1 ? 'lote' : 'lotes'} · ${brlCurto(r(f.id)?.valor ?? 0)} a custo · ${dec(r(f.id)?.unidades_em_risco ?? 0)} un. em risco`}
+              detail={!res ? 'carregando…' : `${int(r(f.id)?.produtos ?? 0)} produtos, ${int(nl)} ${nl === 1 ? 'lote' : 'lotes'} · ${brl(r(f.id)?.valor ?? 0)} a custo · ${dec(r(f.id)?.unidades_em_risco ?? 0)} un. em risco`}
               onClick={() => setFx(fx === f.id ? '' : f.id)} pressed={fx === f.id} />
           )
         })}
@@ -56,7 +55,7 @@ export default function Validades() {
         <SearchBox value={busca} onChange={setBusca} placeholder="Buscar produto" />
       </div>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhuma unidade disponível com esses filtros.</Empty> : (
-        <DataTable busy={loading} caption="Unidades disponíveis por validade" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={l => `${l.idlocalestoque}-${l.idmercadoriavariacao}-${l.lote}-${l.dtvalidade}-${l.dtentrada}`} />
+        <DataTable busy={loading} caption="Unidades disponíveis por validade" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={l => `${l.idlocalestoque}-${l.idmercadoriavariacao}-${l.lote}-${l.dtvalidade}-${l.dtentrada}`} />
       )}
     </>
   )
