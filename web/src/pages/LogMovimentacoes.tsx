@@ -20,8 +20,8 @@ export default function LogMovimentacoes() {
   const page: Page<Mov> | null = r ? { rows: r.linhas, total: r.total } : null
 
   const cols: Col<Mov>[] = [
-    { key: 'quando', label: 'Quando', render: m => celulas(m, true).quando },
     { key: 'produto', label: 'Produto', wrap: true, render: m => celulas(m, true).produto },
+    { key: 'quando', label: 'Quando', render: m => celulas(m, true).quando },
     { key: 'operacao', label: 'Operação', className: 'col-op', render: m => celulas(m, true).operacao },
     { key: 'mov', label: 'Movimento', right: true, render: m => celulas(m, true).movimento },
     { key: 'valor', label: 'Valor', right: true, className: 'money', render: m => celulas(m, true).valor },

@@ -1,5 +1,6 @@
 type N = number | string | null | undefined
-const num = (v: N) => (v === null || v === undefined || v === '' ? null : Number(v))
+// Resto de arredondamento (ex.: -0,004) vira 0: nada de "-R$ 0,00" na tela.
+const num = (v: N) => { if (v === null || v === undefined || v === '') return null; const n = Number(v); return Math.abs(n) < 0.005 ? 0 : n }
 
 const brlFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
 const brl0Fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })

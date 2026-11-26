@@ -42,7 +42,7 @@ function Matriz({ linhas, meses, completos, metrica, nome, ordenar, setOrdenar }
       <div className="toolbar">
         <Tabs label="Ordenar" value={ordenar} onChange={v => { setOrdenar(v); setPagina(1) }} options={[{ id: 'total', label: 'Mais vendidos' }, { id: 'tendencia', label: 'Mais cresceram' }, { id: 'queda', label: 'Mais caíram' }, { id: 'ultimo', label: 'Último mês' }]} />
       </div>
-      <div className="table-wrap matriz"><table>
+      <div className="table-wrap matriz" tabIndex={0} role="region" aria-label={`${nome} mês a mês`}><table>
         <caption className="sr-only">{nome} mês a mês</caption>
         <thead><tr><th>#</th><th>{nome}</th>{MESES.slice(0, meses).map((m, i) => <th key={m} className="r">{m}{i === meses - 1 && meses > completos ? '*' : ''}</th>)}<th className="r">Total</th><th className="r">Tendência</th><th className="r">Meses sem venda</th></tr></thead>
         <tbody>{visiveis.map((l, i) => (
