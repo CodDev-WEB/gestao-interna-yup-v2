@@ -27,7 +27,8 @@ type Ficha = {
   compras: { iddocumento: number; data: string; datahora: string; valor: number; itens: number; desconto: number; vendedor: string | null }[]
   sugestoes: { tipo: 'alta' | 'media' | 'info'; texto: string; item?: number }[]
 }
-type Aba = 'geral' | 'itens' | 'meses' | 'compras'
+type Aba = 'geral' | 'itens' | 'meses' | 'mes' | 'compras'
+type MesCliente = { mes: string; de: string; ate: string; totais: { qtd?: number; bruto?: number; desconto?: number; liquido?: number; lucro?: number; documentos?: number }; produtos: { id: number; nome: string; qtd: number; bruto: number; desconto: number; liquido: number; lucro: number; compras: number; dias: string[] }[] }
 
 const RISCO = {
   baixo: { nome: 'Em dia', cls: 'good', texto: 'Comprando no ritmo de sempre.' },
@@ -140,7 +141,45 @@ function Itens({ f }: { f: Ficha }) {
   )
 }
 
-function Meses({ f }: { f: Ficha }) {
+/** Ficha do mês: cada produto que o cliente comprou no mês escolhido. */
+function ProdutosDoMes({ f, mesSel, setMesSel }: { f: Ficha; mesSel: string; setMesSel: (m: string) => void }) {
+  const meses = [...f.meses].reverse().filter(m => m.valor > 0).map(m => m.mes)
+  const atual = mesSel || meses[0] || ''
+  const { data: r, error, reload } = useApi<MesCliente>(atual ? `dash/cliente-mes?id=${f.cliente.id}&mes=${atual}` : null)
+  if (!meses.length) return <Empty>Sem compras nos últimos 12 meses.</Empty>
+  const t = r?.totais
+  return (
+    <>
+      <div className="toolbar">
+        <label className="field-inline">Mês
+          <select className="select" value={atual} onChange={e => setMesSel(e.target.value)}>
+            {meses.map(m => <option key={m} value={m}>{mes(m + '-01')}</option>)}
+          </select>
+        </label>
+        {r && r.mes === atual && t && <span className="muted">{int(t.documentos ?? 0)} compras · {int(r.produtos.length)} produtos · {brl(t.liquido ?? 0)}{(t.desconto ?? 0) > 0 ? ` · ${brl(t.desconto)} de desconto` : ''}</span>}
+      </div>
+      {error ? <ErrorState message={error} onRetry={reload} /> : !r || r.mes !== atual ? <Loading rows={6} /> : !r.produtos.length ? <Empty>Nenhum produto neste mês.</Empty> : (
+        <div className="table-wrap cards-sm"><table><caption className="sr-only">Produtos comprados em {mes(atual + '-01')}</caption>
+          <thead><tr><th>Produto</th><th className="r">Qtd.</th><th className="r">Valor bruto</th><th className="r">Desconto</th><th className="r">Valor pago</th><th className="r">Preço médio</th><th className="r">Compras</th><th>Dias</th></tr></thead>
+          <tbody>{r.produtos.map(p => (
+            <tr key={p.id}>
+              <td className="wrap"><ItemLink id={p.id}>{p.nome}</ItemLink></td>
+              <td className="r" data-label="Qtd.">{dec(p.qtd)}</td>
+              <td className="r" data-label="Valor bruto">{brl(p.bruto)}</td>
+              <td className="r" data-label="Desconto">{p.desconto > 0 ? brl(p.desconto) : '—'}</td>
+              <td className="r money" data-label="Valor pago">{brl(p.liquido)}</td>
+              <td className="r" data-label="Preço médio">{p.qtd ? brl(p.liquido / p.qtd) : '—'}</td>
+              <td className="r" data-label="Compras">{int(p.compras)}</td>
+              <td className="wrap" data-label="Dias">{p.dias.map(d => d.slice(8, 10) + '/' + d.slice(5, 7)).join(', ')}</td>
+            </tr>))}</tbody>
+          <tfoot><tr><th scope="row">Total do mês</th><td className="r">{dec(t?.qtd ?? 0)}</td><td className="r">{brl(t?.bruto ?? 0)}</td><td className="r">{brl(t?.desconto ?? 0)}</td><td className="r">{brl(t?.liquido ?? 0)}</td><td /><td className="r">{int(t?.documentos ?? 0)}</td><td /></tr></tfoot>
+        </table></div>
+      )}
+    </>
+  )
+}
+
+function Meses({ f, abrirMes }: { f: Ficha; abrirMes: (m: string) => void }) {
   if (f.meses.every(m => m.valor === 0)) return <Empty>Sem compras nos últimos 12 meses.</Empty>
   return (
     <>
@@ -164,7 +203,7 @@ function Meses({ f }: { f: Ficha }) {
         <thead><tr><th>Mês</th><th className="r">Gasto</th><th className="r">Compras</th><th>Principal compra</th></tr></thead>
         <tbody>{[...f.meses].reverse().filter(m => m.valor > 0).map(m => (
           <tr key={m.mes}>
-            <td><span className="title">{mes(m.mes + '-01')}</span></td>
+            <td><button type="button" className="item-link" onClick={() => abrirMes(m.mes)} title="Ver os produtos deste mês">{mes(m.mes + '-01')}</button></td>
             <td className="r money" data-label="Gasto">{brl(m.valor)}</td>
             <td className="r" data-label="Compras">{int(m.compras)}</td>
             <td className="wrap" data-label="Principal compra">{m.principal ? <><ItemLink id={m.principal.id}>{m.principal.nome ?? `Item ${m.principal.id}`}</ItemLink><small>{brl(m.principal.valor)}</small></> : '—'}</td>
@@ -196,6 +235,7 @@ export default function ClientePainel() {
   const id = sp.get('cliente')
   const valido = id && /^\d{1,12}$/.test(id) ? id : null
   const [aba, setAba] = useState<Aba>('geral')
+  const [mesSel, setMesSel] = useState('')
   const fechar = useRef<HTMLButtonElement>(null)
   const { data: f, error, reload } = useApi<Ficha>(valido ? `dash/cliente?id=${valido}` : null)
   const atual = f && String(f.cliente.id) === valido ? f : null
@@ -203,7 +243,7 @@ export default function ClientePainel() {
 
   useEffect(() => {
     if (!valido) return
-    setAba('geral')
+    setAba('geral'); setMesSel('')
     const antes = document.activeElement as HTMLElement | null
     document.body.style.overflow = 'hidden'
     fechar.current?.focus()
@@ -248,12 +288,14 @@ export default function ClientePainel() {
                   { id: 'geral', label: 'Visão geral' },
                   { id: 'itens', label: `Itens${atrasados ? ` (${atrasados} atrasados)` : ''}` },
                   { id: 'meses', label: 'Mês a mês' },
+                  { id: 'mes', label: 'Produtos do mês' },
                   { id: 'compras', label: 'Compras' },
                 ]} />
               </div>
               {aba === 'geral' && <Geral f={atual} />}
               {aba === 'itens' && <Itens f={atual} />}
-              {aba === 'meses' && <Meses f={atual} />}
+              {aba === 'meses' && <Meses f={atual} abrirMes={m => { setMesSel(m); setAba('mes') }} />}
+              {aba === 'mes' && <ProdutosDoMes f={atual} mesSel={mesSel} setMesSel={setMesSel} />}
               {aba === 'compras' && <Compras f={atual} />}
             </>
           )}

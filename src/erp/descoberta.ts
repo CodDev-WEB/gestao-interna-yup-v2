@@ -79,3 +79,41 @@ export async function descobrirAuditoriaDocs(erp: ErpClient) {
   for (const t of ['documento_historico', 'documento_auditoria', 'documento_mercadoria_historico']) await tentar(t, `SELECT * FROM ${t} t ORDER BY 1 DESC`, 3)
   return r
 }
+
+/** Nome de coluna que pode ter dado pessoal ou de cartão: nunca é lido na descoberta. */
+const SENSIVEL = /(senha|token|secret|cpf|cnpj|^rg$|cartao.*num|num.*cartao|bin|nsu|autoriz|seguranca|cvv|chave|email|telefone|celular|fone|endereco|logradouro)/i
+
+/**
+ * Onde o ERP guarda o caixa (abertura, fechamento, sangria, suprimento) e as formas de pagamento das vendas, para
+ * montar a conferência de caixa diária. Só leitura: colunas das tabelas candidatas e até 3 linhas de exemplo de cada
+ * uma, sem as colunas sensíveis. O resultado vai para sync_runs (dataset 'erp_caixa').
+ */
+export async function descobrirCaixa(erp: ErpClient) {
+  const r: Record<string, unknown> = {}
+  const padroes = ['%caixa%', '%pagamento%', '%recebimento%', '%forma%pag%', '%financeiro%', '%titulo%', '%sangria%', '%suprimento%', '%fechamento%', '%parcela%', '%cartao%', '%tef%', '%pix%', '%turno%']
+  const sql = `SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND (${padroes.map(p => `table_name ILIKE '${p}'`).join(' OR ')}) AND table_name NOT ILIKE '%selecao%' ORDER BY table_name, ordinal_position`
+  let colunas: { table_name: string; column_name: string; data_type: string }[] = []
+  try { assertReadOnly(sql); colunas = (await erp.page(sql, 0, 1500)).rows as typeof colunas }
+  catch (e) { r.erro_colunas = String(e instanceof Error ? e.message : e).slice(0, 300) }
+  const porTabela = new Map<string, string[]>()
+  for (const c of colunas) {
+    if (!c.table_name || !c.column_name) continue
+    porTabela.set(c.table_name, [...(porTabela.get(c.table_name) ?? []), `${c.column_name}:${c.data_type}`])
+  }
+  r.tabelas = Object.fromEntries(porTabela)
+  // Exemplos: primeiro as de caixa, depois pagamento/forma, depois o resto (até 14 tabelas).
+  const peso = (t: string) => /caixa/i.test(t) ? 0 : /pagamento|forma/i.test(t) ? 1 : /sangria|suprimento|fechamento|turno/i.test(t) ? 2 : 3
+  const escolhidas = [...porTabela.keys()].filter(t => /^[a-z0-9_]+$/.test(t)).sort((a, b) => peso(a) - peso(b) || a.localeCompare(b)).slice(0, 14)
+  const exemplos: Record<string, unknown> = {}
+  for (const t of escolhidas) {
+    const cols = (porTabela.get(t) ?? []).map(c => c.split(':')[0]).filter(c => /^[a-z0-9_]+$/.test(c) && !SENSIVEL.test(c))
+    if (!cols.length) continue
+    const q = `SELECT ${cols.map(c => `t.${c}`).join(', ')} FROM ${t} t ORDER BY 1 DESC`
+    try {
+      assertReadOnly(q)
+      exemplos[t] = (await erp.page(q, 0, 3)).rows.slice(0, 3).map(l => Object.fromEntries(Object.entries(l).map(([k, v]) => [k, typeof v === 'string' ? v.slice(0, 60) : v])))
+    } catch (e) { exemplos[t] = { erro: String(e instanceof Error ? e.message : e).slice(0, 200) } }
+  }
+  r.exemplos = exemplos
+  return r
+}
