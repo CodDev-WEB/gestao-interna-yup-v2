@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
-import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, RotateCw, Search } from 'lucide-react'
+import { AlertCircle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Info, RotateCw, Search } from 'lucide-react'
 import logo from './assets/logo-yupee.png'
 import { ExportarPagina } from './Exportar'
 import { paginaAtual } from './nav'
@@ -10,24 +10,28 @@ export function Brand() {
   return <><img className="brand-logo" src={logo} alt="" /><div><strong>Yup <span>Intelligence</span></strong><small>Gestão interna</small></div></>
 }
 
-/** Cabeçalho de página: trilha, título, descrição e ações. */
-/** Texto explicativo da página, sempre inteiro: nada de informação escondida em "ver mais". */
-function Explicacao({ children }: { children: ReactNode }) {
-  return <div className="page-desc"><p>{children}</p></div>
-}
-
-export function PageHead({ section, title, children, actions }: { section?: string; title: string; children?: ReactNode; actions?: ReactNode }) {
+/** Cabeçalho de página, compacto como nos sistemas de gestão: trilha, título, (i) com a explicação, ações à direita
+ *  e, embaixo, as abas da página (quando houver). A explicação abre pelo (i) e a escolha fica guardada. */
+export function PageHead({ section, title, children, actions, tabs }: { section?: string; title: string; children?: ReactNode; actions?: ReactNode; tabs?: ReactNode }) {
   const { pathname } = useLocation()
   const grupo = paginaAtual(pathname)?.grupo ?? null
-  const eyebrow = grupo ?? (section && section.toUpperCase() !== title.toUpperCase() ? section : null)
+  const trilha = grupo ?? (section && section.toUpperCase() !== title.toUpperCase() ? section.charAt(0) + section.slice(1).toLowerCase() : null)
+  const [info, setInfo] = useState(() => { try { return localStorage.getItem('yup.explicacao') === '1' } catch { return false } })
+  const alternarInfo = () => setInfo(v => { try { localStorage.setItem('yup.explicacao', v ? '0' : '1') } catch { /* sem storage */ } return !v })
   return (
     <header className="page-head">
-      <div className="page-title">
-        {eyebrow && <span className="page-eyebrow">{eyebrow}</span>}
-        <h1>{title}</h1>
-        {children && <Explicacao>{children}</Explicacao>}
+      <div className="page-linha">
+        <div className="page-title">
+          {trilha && <nav className="trilha" aria-label="Você está em"><span>{trilha}</span><span aria-hidden>/</span><span aria-current="page">{title}</span></nav>}
+          <div className="page-titulo-linha">
+            <h1>{title}</h1>
+            {children && <button type="button" className="icon-btn info-btn" onClick={alternarInfo} aria-expanded={info} aria-controls="explicacao-pagina" aria-label={info ? 'Esconder a explicação da tela' : 'Sobre esta tela'} title="Sobre esta tela"><Info size={16} aria-hidden /></button>}
+          </div>
+        </div>
+        <div className="page-actions">{actions}<ExportarPagina titulo={title} /></div>
       </div>
-      <div className="page-actions">{actions}<ExportarPagina titulo={title} /></div>
+      {children && info && <div className="page-desc" id="explicacao-pagina"><p>{children}</p></div>}
+      {tabs && <div className="page-tabs">{tabs}</div>}
     </header>
   )
 }
@@ -45,8 +49,9 @@ export function Metric({ icon, tone = 'turquoise', label, value, detail, valueCl
 }
 
 /** Abas segmentadas (período, visão). */
-export function Tabs<T extends string>({ value, options, onChange, label }: { value: T; options: { id: T; label: string }[]; onChange: (v: T) => void; label: string }) {
-  return <div className="tabs" role="group" aria-label={label}>{options.map(o => <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)}>{o.label}</button>)}</div>
+/** Grupo de opções. Com `abas`, vira abas sublinhadas (seções da tela); sem, botões compactos (filtro/ordenação). */
+export function Tabs<T extends string>({ value, options, onChange, label, abas }: { value: T; options: { id: T; label: string }[]; onChange: (v: T) => void; label: string; abas?: boolean }) {
+  return <div className={abas ? 'tabs abas' : 'tabs'} role="group" aria-label={label}>{options.map(o => <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)}>{o.label}</button>)}</div>
 }
 
 export function Loading({ rows = 4 }: { rows?: number }) {

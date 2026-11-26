@@ -1,9 +1,10 @@
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { ArrowUp, BadgeCheck, FileBarChart, Menu as MenuIcon, X, CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, IdCard, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { ArrowUp, PanelLeftClose, PanelLeftOpen, Search, BadgeCheck, FileBarChart, Menu as MenuIcon, X, CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, IdCard, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
 import './styles.css'
-import { currentUser, logout, onAuthChange } from './api'
+import { currentUser, logout, onAuthChange, useApi } from './api'
+import { haQuanto } from './format'
 import { Brand } from './ui'
 import ProdutoPainel from './ProdutoPainel'
 import ClientePainel from './ClientePainel'
@@ -44,12 +45,14 @@ function ItemMenu({ item, onNavegar }: { item: ItemNav; onNavegar?: () => void }
   const [aberto, setAberto] = useState(dentro)
   useEffect(() => { if (dentro) setAberto(true) }, [dentro])
   const Icon = item.icon
-  if (!item.filhos) return <NavLink to={item.to} end={item.end} onClick={onNavegar}><Icon size={18} aria-hidden />{item.label}</NavLink>
+  if (!item.filhos) return <NavLink to={item.to} end={item.end} onClick={onNavegar} title={item.label}><Icon size={18} aria-hidden /><span className="nav-label">{item.label}</span></NavLink>
   return (
     <div className={`nav-group${aberto ? ' open' : ''}`}>
-      <button type="button" className={`nav-toggle${dentro ? ' active' : ''}`} aria-expanded={aberto} aria-controls={`sub-${item.to}`} onClick={() => setAberto(a => !a)}>
-        <Icon size={18} aria-hidden />{item.label}<ChevronRight size={14} className="chev" aria-hidden />
+      <button type="button" className={`nav-toggle${dentro ? ' active' : ''}`} aria-expanded={aberto} aria-controls={`sub-${item.to}`} onClick={() => setAberto(a => !a)} title={item.label}>
+        <Icon size={18} aria-hidden /><span className="nav-label">{item.label}</span><ChevronRight size={14} className="chev" aria-hidden />
       </button>
+      {/* Menu recolhido: o grupo vira um atalho direto para a 1ª subaba. */}
+      <NavLink to={item.to} end className="nav-atalho" title={item.label} onClick={onNavegar}><Icon size={18} aria-hidden /><span className="nav-label">{item.label}</span></NavLink>
       {aberto && <div className="nav-sub" id={`sub-${item.to}`}>{item.filhos.map(f => <NavLink key={f.to} to={f.to} end={f.end} onClick={onNavegar}>{f.label}</NavLink>)}</div>}
     </div>
   )
@@ -104,6 +107,35 @@ function BarraCelular({ user }: { user: string }) {
   )
 }
 
+/** Computador: barra fixa no topo com o menu, a marca, a busca de produto, a última leitura do ERP e a conta. */
+function BarraTopo({ user, menuMin, alternarMenu }: { user: string; menuMin: boolean; alternarMenu: () => void }) {
+  const navigate = useNavigate()
+  const [q, setQ] = useState('')
+  const { data } = useApi<{ last_run: { started_at: string; status: string } | null }>('supabase/test')
+  const run = data?.last_run
+  return (
+    <header className="topbar">
+      <button type="button" className="icon-btn" onClick={alternarMenu} aria-label={menuMin ? 'Abrir o menu' : 'Recolher o menu'} aria-pressed={menuMin} title={menuMin ? 'Abrir o menu' : 'Recolher o menu'}>
+        {menuMin ? <PanelLeftOpen size={18} aria-hidden /> : <PanelLeftClose size={18} aria-hidden />}
+      </button>
+      <NavLink to="/" className="brand" aria-label="YUP Intelligence, ir para a visão geral"><Brand /></NavLink>
+      <form role="search" className="topbar-busca" onSubmit={e => { e.preventDefault(); const t = q.trim(); navigate(t ? `/produtos?busca=${encodeURIComponent(t)}` : '/produtos'); setQ('') }}>
+        <Search size={16} aria-hidden />
+        <input className="input" type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar produto: nome, código ou código de barras" aria-label="Buscar produto" />
+      </form>
+      <div className="topbar-dir">
+        {run && (
+          <NavLink to="/sincronizacao" className={`topbar-sync ${run.status === 'error' ? 'bad' : 'good'}`} title="Última leitura do ERP">
+            <i aria-hidden />ERP {run.status === 'error' ? 'com erro' : 'lido'} {haQuanto(run.started_at)}
+          </NavLink>
+        )}
+        <span className="topbar-user" title={user}>{user}</span>
+        <button type="button" className="icon-btn" onClick={logout} aria-label="Sair" title="Sair"><LogOut size={17} aria-hidden /></button>
+      </div>
+    </header>
+  )
+}
+
 /** Volta ao topo quando a página fica longa. */
 function VoltarTopo() {
   const [ver, setVer] = useState(false)
@@ -130,17 +162,16 @@ function App() {
     mainRef.current?.focus({ preventScroll: true })
   }, [pathname])
   const atual = paginaAtual(pathname)
+  // Menu lateral recolhível (só ícones); a escolha fica guardada neste navegador.
+  const [menuMin, setMenuMin] = useState(() => { try { return localStorage.getItem('yup.menu-min') === '1' } catch { return false } })
+  const alternarMenu = () => setMenuMin(m => { try { localStorage.setItem('yup.menu-min', m ? '0' : '1') } catch { /* sem storage */ } return !m })
   if (!user) return <Login />
   return (
-    <div className="shell">
+    <div className={`shell${menuMin ? ' menu-min' : ''}`}>
       <a className="skip-link" href="#conteudo">Pular para o conteúdo</a>
+      <BarraTopo user={user} menuMin={menuMin} alternarMenu={alternarMenu} />
       <aside className="sidebar">
-        <NavLink to="/" className="brand" aria-label="YUP Intelligence, ir para a visão geral"><Brand /></NavLink>
         <Menu />
-        <div className="sidebar-bottom">
-          <span className="sidebar-user">{user}</span>
-          <button onClick={logout} aria-label="Sair"><LogOut size={17} aria-hidden /><span className="sidebar-user-txt">Sair</span></button>
-        </div>
       </aside>
       <header className="topbar-celular">
         <NavLink to="/" className="brand" aria-label="YUP Intelligence, ir para a visão geral"><Brand /></NavLink>

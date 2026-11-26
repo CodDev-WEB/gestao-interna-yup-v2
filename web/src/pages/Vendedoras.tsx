@@ -182,7 +182,7 @@ function FichaVendedora({ de, ate }: { de: string; ate: string }) {
                 <Metric icon={<Users size={16} />} tone="purple" label="Comprou para si" value={brl(comp)} detail={`${int(atual.compras.length)} compras`} />
               </div>
               <div className="drawer-tabs">
-                <Tabs<Aba> label="Seções da ficha" value={aba} onChange={setAba} options={[
+                <Tabs<Aba> abas label="Seções da ficha" value={aba} onChange={setAba} options={[
                   { id: 'vendidos', label: 'O que vendeu' },
                   { id: 'comprados', label: 'O que comprou' },
                   { id: 'compras', label: 'Compras dela' },

@@ -398,7 +398,7 @@ export default function ProdutoPainel() {
                 <Metric icon={<TrendingUp size={16} />} tone="green" label="Vendido 90 dias" value={`${dec(n.qtd_90d)} un.`} detail={n.ultima_venda ? `última venda ${fmtData(n.ultima_venda)}` : 'sem vendas registradas'} />
               </div>
               <div className="drawer-tabs">
-                <Tabs<Aba> label="Seções da ficha" value={aba} onChange={setAba} options={[
+                <Tabs<Aba> abas label="Seções da ficha" value={aba} onChange={setAba} options={[
                   { id: 'geral', label: 'Visão geral' },
                   { id: 'lotes', label: `Lotes${lotesAtivos ? ` (${lotesAtivos})` : ''}` },
                   { id: 'entradas', label: `Entradas${atual.entradas.length ? ` (${atual.entradas.length})` : ''}` },
