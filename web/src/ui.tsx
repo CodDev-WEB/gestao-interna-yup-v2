@@ -115,7 +115,7 @@ export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, 
         </label>
       )}
       {extras > 0 && <div className="mais-colunas"><button type="button" className="chip" aria-pressed={mais} onClick={alternarMais}>{mais ? 'Menos colunas' : `Mais colunas (${extras})`}</button></div>}
-      <div className="table-wrap cards-sm" aria-busy={busy || undefined}>
+      <div className="table-wrap cards-sm" aria-busy={busy || undefined} tabIndex={0} role="region" aria-label={caption}>
         <table>
           <caption className="sr-only">{caption}</caption>
           <thead>

@@ -790,7 +790,7 @@ h1, h2, h3 { text-wrap: balance; }
   .page-title { flex: 0 1 auto; }
   .mais-colunas { display: none; }
 }
-.table-wrap td small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.table-wrap td small { white-space: normal; max-width: 340px; overflow-wrap: anywhere; }
 .table-wrap td.wrap small { white-space: normal; }
 @media (max-width: 760px) { .sheet-head .brand small { display: none; } .table-wrap td small { max-width: none; white-space: normal; } }
 /* Ficha do item sempre por cima das outras fichas (cliente, vendedora). */
@@ -828,5 +828,57 @@ h1, h2, h3 { text-wrap: balance; }
 .mix-causas { margin: 10px 0; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
 .mix-detalhe { margin-top: 12px; }
 .mix-detalhe h4 { margin: 0 0 8px; font-size: 13.5px; }
-.up { color: #1d8a4e; }
+.up { color: #17713f; }
 .down { color: #c9302c; }
+
+/* ============ Tabelas como planilha (computador e tablet) ============
+   Cada tabela cabe na janela e rola por dentro: a linha de títulos fica fixa no topo, a primeira coluna fixa à
+   esquerda, o total fixo embaixo e a barra de rolagem lateral sempre à vista (sem ir ao fim da página).
+   Grade de linhas como no Excel, números alinhados e nenhum texto cortado com "...". No celular continua cartão. */
+@media (min-width: 761px) {
+  .table-wrap { max-height: max(420px, calc(100dvh - 96px)); overflow: auto; overscroll-behavior: contain; border: 1px solid var(--line-2); border-radius: 10px; background: #fff; scrollbar-gutter: stable; }
+  .drawer .table-wrap { max-height: 70dvh; }
+  .aud-card .table-wrap, .rel-secao .table-wrap { max-height: 70dvh; }
+  .table-wrap table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+  .table-wrap th, .table-wrap td { padding: 7px 12px; border-top: 0; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); font-size: 13px; line-height: 1.4; }
+  .table-wrap th:last-child, .table-wrap td:last-child { border-right: 0; }
+  .table-wrap thead th { position: sticky; top: 0; z-index: 3; background: #f2f2f5; color: #48484c; font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--line-2); vertical-align: bottom; white-space: nowrap; }
+  .table-wrap tbody td { background: #fff; vertical-align: top; }
+  .table-wrap tbody tr:nth-child(even) td { background: #fafafb; }
+  .table-wrap tbody tr:hover td { background: #eef7f8; }
+  /* Primeira coluna (o "do quê" da linha) fixa ao rolar para o lado */
+  .table-wrap tbody td:first-child, .table-wrap thead th:first-child, .table-wrap tfoot :is(td, th):first-child { position: sticky; left: 0; z-index: 2; box-shadow: inset -1px 0 var(--line-2); }
+  .table-wrap thead th:first-child { z-index: 4; }
+  /* Total sempre à vista no pé da tabela */
+  .table-wrap tfoot :is(td, th) { position: sticky; bottom: 0; z-index: 2; background: #f2f2f5; border-top: 2px solid var(--line-2); border-bottom: 0; font-weight: 700; }
+  .table-wrap tfoot :is(td, th):first-child { z-index: 4; }
+  /* Texto inteiro, sem reticências: colunas de texto quebram linha com largura confortável */
+  .table-wrap td.wrap, .table-wrap td.wrap-texto, .table-wrap td.col-op { white-space: normal; min-width: 200px; max-width: 420px; }
+  .table-wrap td { font-variant-numeric: tabular-nums; }
+  .table-wrap td small { font-size: 11.5px; }
+  .table-wrap th button { color: inherit; }
+  /* Matriz mês a mês: "#" e produto fixos */
+  .matriz th:first-child, .matriz td:first-child { width: 44px; min-width: 44px; max-width: 44px; text-align: right; }
+  .matriz tbody td:nth-child(2), .matriz thead th:nth-child(2) { position: sticky; left: 44px; z-index: 2; box-shadow: inset -1px 0 var(--line-2); }
+  .matriz thead th:nth-child(2) { z-index: 4; }
+  .matriz tbody td:first-child, .matriz thead th:first-child { box-shadow: none; }
+  .matriz tbody tr:nth-child(even) td.recorde, .matriz td.recorde { background: #fbf1cf; }
+}
+@media print { .table-wrap { max-height: none; overflow: visible; } }
+@media (min-width: 761px) {
+  .table-wrap tbody td:first-child, .table-wrap thead th:first-child { max-width: 380px; }
+  .table-wrap tbody td:first-child { white-space: normal; }
+  .matriz tbody td:nth-child(2), .matriz thead th:nth-child(2) { max-width: 360px; white-space: normal; }
+  /* Barra de rolagem sempre visível e fácil de pegar, como numa planilha */
+  .table-wrap { scrollbar-width: auto; scrollbar-color: #b9b9c0 #f2f2f5; }
+  .table-wrap::-webkit-scrollbar { width: 12px; height: 12px; }
+  .table-wrap::-webkit-scrollbar-track { background: #f2f2f5; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #b9b9c0; border-radius: 6px; border: 2px solid #f2f2f5; }
+  .table-wrap::-webkit-scrollbar-thumb:hover { background: #8e8e93; }
+  .table-wrap::-webkit-scrollbar-corner { background: #f2f2f5; }
+}
+@media (min-width: 761px) and (max-width: 1279px) {
+  .table-wrap tbody td:first-child, .table-wrap thead th:first-child, .matriz tbody td:nth-child(2), .matriz thead th:nth-child(2) { max-width: 280px; }
+}
+.table-wrap tfoot :is(th, td) small { display: block; font-weight: 500; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.table-wrap:focus-visible { outline: 2px solid var(--turquoise-ink); outline-offset: 2px; }
