@@ -6,7 +6,6 @@ import { type Col, DataTable, Empty, ErrorState, Loading, PageHead, SearchBox, u
 
 type Cliente = { idcliente: number; nome: string | null; compras: number; valor_total: number | string; ticket_medio: number | string; ultima_compra: string; recencia_dias: number; intervalo_medio_dias: number | string | null; proxima_compra_prevista: string | null; segmento: string }
 
-const PAGE = 50
 const nomeSeg = (id: string) => SEGMENTOS.find(s => s.id === id)?.nome ?? id
 
 export default function Clientes() {
@@ -17,7 +16,7 @@ export default function Clientes() {
   const [minValor, setMinValor] = useParam('min_valor')
   const [minCompras, setMinCompras] = useParam('min_compras')
   const t = useTableState('valor_total')
-  const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
+  const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), ordem: t.sort, dir: t.dir })
   if (seg) qs.set('segmento', seg); if (busca) qs.set('busca', busca)
   if (recompra) qs.set('recompra', recompra); if (ultima) qs.set('ultima', ultima); if (minValor) qs.set('min_valor', minValor); if (minCompras) qs.set('min_compras', minCompras)
   const filtrosAtivos = [recompra, ultima, minValor, minCompras].filter(Boolean).length
@@ -71,7 +70,7 @@ export default function Clientes() {
       {recompra === 'atrasada' && <p className="hint"><strong>Atrasados para voltar:</strong> passaram da data em que costumam comprar de novo, nos últimos 180 dias. São os melhores para um contato agora. Clique no nome para ver o que oferecer.</p>}
       {atual && <p className="hint"><strong>{atual.nome}:</strong> {atual.desc}.</p>}
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum cliente com esses filtros.</Empty> : (
-        <DataTable busy={loading} caption="Clientes" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={c => String(c.idcliente)} />
+        <DataTable busy={loading} caption="Clientes" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={c => String(c.idcliente)} />
       )}
     </>
   )

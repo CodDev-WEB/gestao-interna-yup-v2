@@ -241,7 +241,7 @@ export default function ClientePainel() {
                 <Metric icon={<Wallet size={16} />} tone="gold" label="Gasto por mês" value={brl(m.valor_mensal_6m)} detail="média dos últimos 6 meses" />
                 <Metric icon={m.variacao_90d_pct !== null && m.variacao_90d_pct < 0 ? <TrendingDown size={16} /> : <TrendingUp size={16} />} tone={m.variacao_90d_pct !== null && m.variacao_90d_pct < -20 ? 'red' : 'green'} label="Últimos 90 dias" value={brl(m.valor_90d)} detail={m.variacao_90d_pct === null ? 'sem base anterior' : `${m.variacao_90d_pct >= 0 ? '+' : ''}${pct(m.variacao_90d_pct, 0)} vs. 90 dias antes`} />
                 <Metric icon={<CalendarClock size={16} />} tone={m.risco === 'baixo' ? 'turquoise' : 'red'} label="Compra a cada" value={m.intervalo_dias ? (m.intervalo_dias === 1 ? '1 dia' : `${int(m.intervalo_dias)} dias`) : '—'} detail={m.atraso_dias !== null && m.atraso_dias > 0 ? `${int(m.atraso_dias)} dias de atraso` : `próxima ${fmtData(m.proxima_prevista)}`} />
-                <Metric icon={<HeartPulse size={16} />} tone="purple" label="Ticket médio" value={brl(m.ticket_medio)} detail={`${int(m.compras)} compras, ${brlCurto(m.total)} no total`} />
+                <Metric icon={<HeartPulse size={16} />} tone="purple" label="Ticket médio" value={brl(m.ticket_medio)} detail={`${int(m.compras)} compras, ${brl(m.total)} no total`} />
               </div>
               <div className="drawer-tabs">
                 <Tabs<Aba> label="Seções da ficha" value={aba} onChange={setAba} options={[

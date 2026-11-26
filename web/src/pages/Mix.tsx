@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowDownRight, ArrowUpRight, Award, Package, Star, Users } from 'lucide-react'
 import { api, useApi } from '../api'
-import { brl, brlCurto, dec, int, pct } from '../format'
+import { brl, dec, int, pct } from '../format'
 import { CATEGORIAS, decodificar, diagnosticar, linhaDe, linhasComMigracao, MESES, tamanho, variacao, type Categoria, type ItemMes, type Linha, type RespMix, type RespMixBruta } from '../mixCalculo'
 import { ItemLink } from '../ProdutoPainel'
 import { Empty, ErrorState, Loading, Metric, PageHead, SearchBox, Tabs } from '../ui'
@@ -159,7 +159,7 @@ export default function Mix() {
       {error ? <ErrorState message={error} onRetry={reload} /> : !r ? <><p className="hint">Juntando as vendas de cada mês do ano… (alguns segundos)</p><Loading rows={8} /></> : (
         <div aria-busy={loading || undefined}>
           <div className="metrics">
-            <Metric icon={<Package size={18} />} tone="turquoise" label="Produtos vendidos no ano" value={int(itens.length)} detail={`${brlCurto(totalAno)} em vendas`} />
+            <Metric icon={<Package size={18} />} tone="turquoise" label="Produtos vendidos no ano" value={int(itens.length)} detail={`${brl(totalAno)} em vendas`} />
             <Metric icon={<ArrowUpRight size={18} />} tone="green" label="Em alta" value={int(porCat('alta').length)} detail="últimos 3 meses +20% ou mais" onClick={() => { set({ aba: 'diagnostico' }); setCat('alta') }} />
             <Metric icon={<ArrowDownRight size={18} />} tone="red" label="Em queda ou parados" value={int(porCat('queda').length + porCat('parou').length)} detail={`${int(porCat('parou').length)} pararam de vender`} onClick={() => { set({ aba: 'diagnostico' }); setCat('queda') }} />
             <Metric icon={<Award size={18} />} tone="gold" label="Bateram recorde" value={int(itens.filter(i => diag.get(i.id)?.recordeRecente).length)} detail="melhor mês do ano foi o último" />

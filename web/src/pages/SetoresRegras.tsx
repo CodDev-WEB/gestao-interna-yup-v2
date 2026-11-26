@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { api, useApi } from '../api'
-import { brlCurto, int } from '../format'
+import { brl, int } from '../format'
 import { SETORES, SETOR_COR } from '../labels'
 import { nivelPrefixo, nomeCapitulo, nomePosicao, nomePrefixo } from '../ncm'
 import { Empty, ErrorState, Loading, PageHead } from '../ui'
@@ -86,7 +86,7 @@ export default function SetoresRegras() {
                   <td><span className="title"><code className="ncm-code">{r.prefixo}</code> {nomePrefixo(r.prefixo)}</span></td>
                   <td data-label="Nível">{nivelPrefixo(r.prefixo)}</td>
                   <td className="r" data-label="Produtos">{int(alcance.get(r.prefixo)?.produtos ?? 0)}</td>
-                  <td className="r" data-label="Estoque">{brlCurto(alcance.get(r.prefixo)?.valor ?? 0)}</td>
+                  <td className="r" data-label="Estoque">{brl(alcance.get(r.prefixo)?.valor ?? 0)}</td>
                   <td data-label="Setor">
                     <span className="tag" style={{ marginRight: 8 }}><i style={{ background: SETOR_COR[r.setor] }} aria-hidden /></span>
                     <select className="select" value={r.setor} disabled={salvando === r.prefixo} onChange={e => salvar(r.prefixo, e.target.value)} aria-label={`Setor do código ${r.prefixo}`}>
@@ -115,7 +115,7 @@ export default function SetoresRegras() {
                   <tr key={pos}>
                     <td><span className="title"><code className="ncm-code">{pos}</code> {nomePosicao(pos, a.desc)}</span><small>{nomeCapitulo(pos.slice(0, 2))}</small></td>
                     <td className="r" data-label="Produtos">{int(a.produtos)}</td>
-                    <td className="r" data-label="Estoque">{brlCurto(a.valor)}</td>
+                    <td className="r" data-label="Estoque">{brl(a.valor)}</td>
                     <td data-label="Criar regra">
                       <select className="select" defaultValue="" disabled={salvando === pos} onChange={e => e.target.value && salvar(pos, e.target.value)} aria-label={`Setor para o subgrupo ${pos}`}>
                         <option value="">Escolher setor…</option>

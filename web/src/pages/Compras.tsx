@@ -14,7 +14,6 @@ type Item = {
 type Param = { classe: string; nivel_servico: number | string; prazo_entrega_dias: number; revisao_dias: number }
 type Resp = Page<Item> & { carga: Carga; parametros: Param[] }
 
-const PAGE = 50
 
 export default function Compras() {
   const [classe, setClasse] = useParam('classe')
@@ -22,7 +21,7 @@ export default function Compras() {
   const [busca, setBusca] = useParam('busca')
   // Sem ordem escolhida, a API ordena por prioridade: classe A primeiro, itens em falta, maior venda.
   const t = useTableState('prioridade')
-  const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
+  const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), ordem: t.sort, dir: t.dir })
   if (classe) qs.set('classe', classe); if (ruptura) qs.set('ruptura', '1'); if (busca) qs.set('busca', busca)
   const { data: p, error, loading, reload } = useApi<Resp>(`dash/reposicao?${qs}`)
 
@@ -57,7 +56,7 @@ export default function Compras() {
         <SearchBox value={busca} onChange={setBusca} placeholder="Buscar produto" />
       </div>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum item precisa de compra com esses filtros.</Empty> : (
-        <DataTable busy={loading} caption="Compras sugeridas" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={r => String(r.idmercadoriavariacao)} />
+        <DataTable busy={loading} caption="Compras sugeridas" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={r => String(r.idmercadoriavariacao)} />
       )}
       {p && p.parametros.length > 0 && (
         <section className="panel section" aria-labelledby="param-h">

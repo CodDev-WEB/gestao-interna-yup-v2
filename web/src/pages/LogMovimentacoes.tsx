@@ -3,7 +3,6 @@ import { useApi, type Page } from '../api'
 import { celulas, TIPOS_LOG, type Mov, type RespLog } from '../LogMovimentos'
 import { type Col, DataTable, Empty, ErrorState, Loading, PageHead, SearchBox, useParam, useTableState } from '../ui'
 
-const PAGE = 50
 const hoje = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Belem' }).format(new Date())
 const menos = (iso: string, d: number) => { const [y, m, dd] = iso.split('-').map(Number); return new Date(Date.UTC(y, m - 1, dd - d)).toISOString().slice(0, 10) }
 
@@ -14,7 +13,7 @@ export default function LogMovimentacoes() {
   const [usuario, setUsuario] = useParam('usuario')
   const [busca, setBusca] = useParam('busca')
   const t = useTableState('datahora', 'desc')
-  const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), de, ate })
+  const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), de, ate })
   if (tipo) qs.set('tipo', tipo); if (usuario) qs.set('usuario', usuario); if (busca) qs.set('busca', busca)
   const { data: r, error, loading, reload } = useApi<RespLog>(`dash/log?${qs}`)
   const { data: usuarios } = useApi<{ id: number; nome: string; movimentos: number }[]>('dash/log-usuarios')
@@ -54,7 +53,7 @@ export default function LogMovimentacoes() {
         <SearchBox value={busca} onChange={setBusca} placeholder="Produto: nome ou código" />
       </div>
       {error ? <ErrorState message={error} onRetry={reload} /> : !page ? <Loading /> : page.rows.length === 0 ? <Empty>Nenhuma movimentação com esses filtros.</Empty> : (
-        <DataTable busy={loading} caption="Log de movimentações" cols={cols} rows={page.rows} total={page.total} page={t.page} pageSize={PAGE} onPage={t.onPage} rowKey={m => m.id} />
+        <DataTable busy={loading} caption="Log de movimentações" cols={cols} rows={page.rows} total={page.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} rowKey={m => m.id} />
       )}
     </>
   )

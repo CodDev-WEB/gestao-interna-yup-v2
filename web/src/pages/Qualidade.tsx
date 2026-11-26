@@ -1,6 +1,6 @@
 import { AlertTriangle, Barcode, CalendarX, FileWarning, MinusCircle } from 'lucide-react'
 import { type Page, useApi } from '../api'
-import { brl, brlCurto, dec, int } from '../format'
+import { brl, dec, int } from '../format'
 import { AvisoCarga, CLASSES, ClasseTag, PROBLEMAS, problema, type ResumoQualidade } from '../gestao'
 import { ItemLink } from '../ProdutoPainel'
 import { type Col, DataTable, Empty, ErrorState, Loading, Metric, PageHead, SearchBox, useParam, useTableState } from '../ui'
@@ -10,7 +10,6 @@ type Linha = {
   faturamento: number | string; estoque: number | string; problema: string; valor: number | string | null; detalhe: string
 }
 
-const PAGE = 50
 const ICONES = { estoque_negativo: MinusCircle, lote_vencido: CalendarX, sem_codigo_barras: Barcode, ncm_invalido: FileWarning, sem_custo: AlertTriangle } as const
 
 export default function Qualidade() {
@@ -18,7 +17,7 @@ export default function Qualidade() {
   const [classe, setClasse] = useParam('classe')
   const [busca, setBusca] = useParam('busca')
   const t = useTableState('prioridade')
-  const qs = new URLSearchParams({ limit: String(PAGE), offset: String((t.page - 1) * PAGE), ordem: t.sort, dir: t.dir })
+  const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), ordem: t.sort, dir: t.dir })
   if (prob) qs.set('problema', prob); if (classe) qs.set('classe', classe); if (busca) qs.set('busca', busca)
   const { data: p, error, loading, reload } = useApi<Page<Linha>>(`dash/qualidade?${qs}`)
   const { data: res } = useApi<ResumoQualidade>('dash/qualidade-resumo')
@@ -31,7 +30,7 @@ export default function Qualidade() {
     { key: 'problema', label: 'Problema', wrap: true, render: l => <>{problema(l.problema).nome}<small>{l.detalhe}</small></> },
     { key: 'estoque', label: 'Estoque', right: true, sort: true, render: l => dec(l.estoque) },
     { key: 'valor', label: 'Valor envolvido', right: true, sort: true, className: 'money', render: l => l.valor === null ? <span className="muted">—</span> : brl(l.valor) },
-    { key: 'faturamento', label: 'Vendeu no ano', right: true, sort: true, sm: false, render: l => brlCurto(l.faturamento) },
+    { key: 'faturamento', label: 'Vendeu no ano', right: true, sort: true, sm: false, render: l => brl(l.faturamento) },
   ]
 
   return (
@@ -51,7 +50,7 @@ export default function Qualidade() {
           const v = r(x.id), n = v?.itens ?? 0, Icon = ICONES[x.id]
           return (
             <Metric key={x.id} icon={<Icon size={18} />} tone={n > 0 ? 'red' : 'green'} label={x.nome}
-              value={int(n)} detail={`${int(v?.itens_a ?? 0)} da classe A${v && Number(v.valor) > 0 ? ` · ${brlCurto(v.valor)}` : ''}`}
+              value={int(n)} detail={`${int(v?.itens_a ?? 0)} da classe A${v && Number(v.valor) > 0 ? ` · ${brl(v.valor)}` : ''}`}
               onClick={() => setProb(prob === x.id ? '' : x.id)} pressed={prob === x.id} />
           )
         })}
@@ -65,7 +64,7 @@ export default function Qualidade() {
         <SearchBox value={busca} onChange={setBusca} placeholder="Buscar produto" />
       </div>
       {error ? <ErrorState message={error} onRetry={reload} /> : !p ? <Loading /> : p.rows.length === 0 ? <Empty>Nenhum problema com esses filtros.</Empty> : (
-        <DataTable busy={loading} caption="Problemas de dado por item" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={PAGE} onPage={t.onPage} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={l => `${l.problema}-${l.idmercadoriavariacao}`} />
+        <DataTable busy={loading} caption="Problemas de dado por item" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={l => `${l.problema}-${l.idmercadoriavariacao}`} />
       )}
       <p className="hint" style={{ marginTop: 16 }}>As correções são feitas no ERP. O painel lê de novo a cada sincronização e o item sai desta lista sozinho.</p>
     </>

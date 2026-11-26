@@ -11,23 +11,9 @@ export function Brand() {
 }
 
 /** Cabeçalho de página: trilha, título, descrição e ações. */
-/** Texto explicativo da página: mostra duas linhas e o resto em "ver mais", para o conteúdo aparecer logo. */
+/** Texto explicativo da página, sempre inteiro: nada de informação escondida em "ver mais". */
 function Explicacao({ children }: { children: ReactNode }) {
-  const ref = useRef<HTMLParagraphElement>(null)
-  const [aberto, setAberto] = useState(false)
-  const [longo, setLongo] = useState(false)
-  useEffect(() => {
-    const el = ref.current; if (!el) return
-    const medir = () => setLongo(el.scrollHeight > el.clientHeight + 2 || aberto)
-    medir(); window.addEventListener('resize', medir)
-    return () => window.removeEventListener('resize', medir)
-  }, [children, aberto])
-  return (
-    <div className="page-desc">
-      <p ref={ref} className={aberto ? 'aberto' : undefined}>{children}</p>
-      {longo && <button type="button" className="ver-mais" onClick={() => setAberto(a => !a)} aria-expanded={aberto}>{aberto ? 'ver menos' : 'ver mais'}</button>}
-    </div>
-  )
+  return <div className="page-desc"><p>{children}</p></div>
 }
 
 export function PageHead({ section, title, children, actions }: { section?: string; title: string; children?: ReactNode; actions?: ReactNode }) {
@@ -87,20 +73,27 @@ export function useParam(name: string, def = ''): [string, (v: string) => void] 
 }
 
 /** sm: false esconde a coluna nos cartões do celular (dado secundário). */
-/** extra: coluna secundária, escondida até a pessoa pedir "Mais colunas" (tabela mais limpa). */
+/** extra: coluna secundária; aparece por padrão e some quando a pessoa pede "Ocultar colunas". */
 export type Col<T> = { key: string; label: string; right?: boolean; wrap?: boolean; sort?: boolean; sm?: false; extra?: boolean; className?: string; render: (r: T) => ReactNode }
 
+/** Quantas linhas por página a pessoa pode escolher (a API aceita até 200). */
+export const PAGE_SIZES = [50, 100, 200]
+
 /** Tabela com ordenação e paginação do servidor. No celular, cada linha vira um cartão. */
-export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, dir, onSort, rowKey, caption, busy }: {
+export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, onPageSize, sort, dir, onSort, rowKey, caption, busy }: {
   cols: Col<T>[]; rows: T[]; total: number; page: number; pageSize: number; onPage: (p: number) => void
+  /** Troca quantas linhas vêm por página (50/100/200). */
+  onPageSize?: (n: number) => void
   sort?: string; dir?: string; onSort?: (key: string) => void; rowKey: (r: T) => string; caption: string
   /** true enquanto uma nova página/filtro carrega: a tabela atual fica esmaecida. */
   busy?: boolean
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize))
-  const [mais, setMais] = useState(() => { try { return localStorage.getItem('yup.mais-colunas') === '1' } catch { return false } })
+  // Sistema de análise: todas as colunas aparecem por padrão; a pessoa pode reduzir.
+  const [mais, setMais] = useState(() => { try { return localStorage.getItem('yup.colunas-reduzidas') !== '1' } catch { return true } })
   const extras = cols.filter(c => c.extra).length
-  const alternarMais = () => setMais(m => { try { localStorage.setItem('yup.mais-colunas', m ? '0' : '1') } catch { /* sem storage */ } return !m })
+  const alternarMais = () => setMais(m => { try { localStorage.setItem('yup.colunas-reduzidas', m ? '1' : '0') } catch { /* sem storage */ } return !m })
+  const de = total === 0 ? 0 : (page - 1) * pageSize + 1, ate = Math.min(total, page * pageSize)
   cols = mais ? cols : cols.filter(c => !c.extra)
   const sortable = cols.filter(c => c.sort)
   const Arrow = dir === 'asc' ? ArrowUp : ArrowDown
@@ -114,8 +107,23 @@ export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, 
           <button type="button" className="btn secondary" onClick={() => sort && onSort(sort)} aria-label={dir === 'asc' ? 'Crescente; inverter' : 'Decrescente; inverter'}><Arrow size={16} aria-hidden /></button>
         </label>
       )}
-      {extras > 0 && <div className="mais-colunas"><button type="button" className="chip" aria-pressed={mais} onClick={alternarMais}>{mais ? 'Menos colunas' : `Mais colunas (${extras})`}</button></div>}
-      <div className="table-wrap cards-sm" aria-busy={busy || undefined}>
+      <div className="pager pager-top">
+        <span className="pager-count">{total === 0 ? '0 itens' : <>Linhas <b>{de.toLocaleString('pt-BR')}–{ate.toLocaleString('pt-BR')}</b> de <b>{total.toLocaleString('pt-BR')}</b></>}</span>
+        <span>
+          {extras > 0 && <button type="button" className="chip" aria-pressed={!mais} onClick={alternarMais}>{mais ? `Ocultar ${extras} ${extras === 1 ? 'coluna' : 'colunas'}` : `Mostrar todas as colunas (+${extras})`}</button>}
+          {onPageSize && (
+            <label className="pager-size">Por página
+              <select className="select" value={pageSize} onChange={e => onPageSize(Number(e.target.value))}>
+                {PAGE_SIZES.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+          )}
+          <button className="btn secondary" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Página anterior"><ChevronLeft size={16} aria-hidden /></button>
+          <span className="pager-pos">{page} de {pages}</span>
+          <button className="btn secondary" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="Próxima página"><ChevronRight size={16} aria-hidden /></button>
+        </span>
+      </div>
+      <div className="table-wrap table-grid cards-sm" aria-busy={busy || undefined} tabIndex={0} role="region" aria-label={caption}>
         <table>
           <caption className="sr-only">{caption}</caption>
           <thead>
@@ -126,11 +134,11 @@ export function DataTable<T>({ cols, rows, total, page, pageSize, onPage, sort, 
             ))}</tr>
           </thead>
           <tbody>
-            {rows.map(r => <tr key={rowKey(r)}>{cols.map(c => <td key={c.key} data-label={c.label} className={[c.right ? 'r' : '', c.wrap ? 'wrap' : '', c.sm === false ? 'hide-sm' : '', c.className ?? ''].join(' ').trim() || undefined}>{c.render(r)}</td>)}</tr>)}
+            {rows.map(r => <tr key={rowKey(r)}>{cols.map(c => <td key={c.key} data-label={c.label} className={[c.right ? 'r' : '', c.wrap ? 'wrap' : '', c.sm === false || c.extra ? 'hide-sm' : '', c.className ?? ''].join(' ').trim() || undefined}>{c.render(r)}</td>)}</tr>)}
           </tbody>
         </table>
       </div>
-      <div className="pager">
+      <div className="pager pager-bottom">
         <span>{total.toLocaleString('pt-BR')} {total === 1 ? 'item' : 'itens'}</span>
         <span>
           <button className="btn secondary" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="Página anterior"><ChevronLeft size={16} aria-hidden />Anterior</button>
@@ -147,9 +155,11 @@ export function useTableState(defSort: string, defDir: 'asc' | 'desc' = 'desc') 
   const [sort, setSort] = useParam('ordem', defSort)
   const [dir, setDir] = useParam('dir', defDir)
   const [pagina, setPagina] = useParam('pagina', '1')
+  const [linhas, setLinhas] = useParam('linhas', '50')
   const page = Math.max(1, Number(pagina) || 1)
+  const pageSize = PAGE_SIZES.includes(Number(linhas)) ? Number(linhas) : 50
   const onSort = (k: string) => { if (k === sort) setDir(dir === 'asc' ? 'desc' : 'asc'); else { setSort(k); setDir('desc') } }
-  return { sort, dir, page, onSort, onPage: (p: number) => setPagina(String(p)) }
+  return { sort, dir, page, pageSize, onSort, onPage: (p: number) => setPagina(String(p)), onPageSize: (n: number) => setLinhas(String(n)) }
 }
 
 /** Busca que filtra sozinha enquanto a pessoa digita (Enter aplica na hora). */

@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Boxes, FolderTree, Hash, PackageX } from 'lucide-react'
 import { type Page, useApi } from '../api'
-import { brl, brlCurto, dec, int, pct } from '../format'
+import { brl, dec, int, pct } from '../format'
 import { SETORES, SETOR_COR, situacao } from '../labels'
 import { formatarNcm, nomeCapitulo, nomePosicao } from '../ncm'
 import { ItemLink } from '../ProdutoPainel'
@@ -30,8 +30,8 @@ function Numeros({ s, total }: { s: Soma; total: number }) {
   return (
     <span className="tree-nums">
       <span title="Produtos (com estoque)"><b>{int(s.produtos)}</b> prod.{s.com_estoque !== s.produtos && <small> · {int(s.com_estoque)} c/ estoque</small>}</span>
-      <span title="Valor do estoque a custo"><b>{brlCurto(s.valor_estoque)}</b> estoque</span>
-      <span title="Faturamento nos últimos 90 dias"><b>{brlCurto(s.faturamento_90d)}</b> 90d{total > 0 && <small> · {pct(s.faturamento_90d / total * 100)}</small>}</span>
+      <span title="Valor do estoque a custo"><b>{brl(s.valor_estoque)}</b> estoque</span>
+      <span title="Faturamento nos últimos 90 dias"><b>{brl(s.faturamento_90d)}</b> 90d{total > 0 && <small> · {pct(s.faturamento_90d / total * 100)}</small>}</span>
       <span title="Margem nos últimos 90 dias">margem <b>{s.faturamento_90d > 0 ? pct(s.lucro_90d / s.faturamento_90d * 100) : '—'}</b></span>
     </span>
   )
@@ -117,8 +117,8 @@ export default function SetoresCategorias() {
       <div className="metrics" style={{ marginBottom: 16 }}>
         <Metric icon={<Hash size={18} />} tone="turquoise" label="Produtos com NCM" value={pct(tudo.produtos ? (tudo.produtos - semNcm.produtos) / tudo.produtos * 100 : null)} detail={`${int(tudo.produtos - semNcm.produtos)} de ${int(tudo.produtos)} produtos`} />
         <Metric icon={<FolderTree size={18} />} tone="blue" label="Grupos (capítulos)" value={int(capitulos)} detail={`${int(ncms)} NCMs diferentes`} />
-        <Metric icon={<Boxes size={18} />} tone="gold" label="Estoque classificado" value={brlCurto(tudo.valor_estoque - semNcm.valor_estoque)} detail={`de ${brlCurto(tudo.valor_estoque)} a custo`} />
-        <Metric icon={<PackageX size={18} />} tone={semNcm.produtos ? 'red' : 'green'} label="Sem NCM" value={int(semNcm.produtos)} detail={semNcm.produtos ? `${brlCurto(semNcm.valor_estoque)} em estoque` : 'todos os produtos têm NCM'} />
+        <Metric icon={<Boxes size={18} />} tone="gold" label="Estoque classificado" value={brl(tudo.valor_estoque - semNcm.valor_estoque)} detail={`de ${brl(tudo.valor_estoque)} a custo`} />
+        <Metric icon={<PackageX size={18} />} tone={semNcm.produtos ? 'red' : 'green'} label="Sem NCM" value={int(semNcm.produtos)} detail={semNcm.produtos ? `${brl(semNcm.valor_estoque)} em estoque` : 'todos os produtos têm NCM'} />
       </div>
       {data.length > 0 && tudo.produtos > 0 && semNcm.produtos === tudo.produtos && (
         <div className="notice"><Hash size={18} aria-hidden /><div><strong>Os NCMs ainda não chegaram do ERP.</strong> O cadastro de produtos é relido uma vez por dia; quando o NCM for copiado, a árvore se monta sozinha.</div></div>
