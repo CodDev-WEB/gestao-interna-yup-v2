@@ -10,8 +10,9 @@ import { brl, dec, int, pct } from '../format'
 import { CATEGORIAS, decodificar, diagnosticar, linhaDe, linhasComMigracao, MESES, tamanho, variacao, type Categoria, type ItemMes, type Linha, type RespMix, type RespMixBruta } from '../mixCalculo'
 import { ItemLink } from '../ProdutoPainel'
 import { Empty, ErrorState, Loading, Metric, PageHead, SearchBox, Tabs } from '../ui'
+import { PerdaVolume, SelectSetorComercial, SetoresMes } from '../setoresComerciais'
 
-type Aba = 'produtos' | 'fornecedores' | 'diagnostico' | 'embalagens'
+type Aba = 'produtos' | 'fornecedores' | 'setores' | 'perda' | 'diagnostico' | 'embalagens'
 type Metrica = 'qtd' | 'valor'
 const PAGINA = 50
 const anoAtual = () => Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Belem' }).format(new Date()).slice(0, 4))
@@ -113,13 +114,14 @@ export default function Mix() {
   const set = (k: Record<string, string | null>) => setSp(prev => { const n = new URLSearchParams(prev); for (const [a, b] of Object.entries(k)) b === null || b === '' ? n.delete(a) : n.set(a, b); return n }, { replace: true })
   const ano = Number(sp.get('ano')) || anoAtual()
   const setor = sp.get('setor') ?? ''
+  const setorc = sp.get('setorc') ?? ''
   const aba = (sp.get('aba') as Aba) || 'produtos'
   const metrica = (sp.get('metrica') as Metrica) || 'qtd'
   const busca = sp.get('busca') ?? ''
   const [ordenar, setOrdenar] = useState('total')
   const [cat, setCat] = useState<Categoria | ''>('')
   const [aberta, setAberta] = useState<string | null>(null)
-  const { data: bruto, error, loading, reload } = useApi<RespMixBruta>(`dash/mix?ano=${ano}${setor ? `&setor=${encodeURIComponent(setor)}` : ''}`)
+  const { data: bruto, error, loading, reload } = useApi<RespMixBruta>(`dash/mix?ano=${ano}${setor ? `&setor=${encodeURIComponent(setor)}` : ''}${setorc ? `&setorc=${encodeURIComponent(setorc)}` : ''}`)
   const r: RespMix | null = useMemo(() => (bruto ? decodificar(bruto) : null), [bruto])
   const meses = r?.meses_com_dados ?? 0
   const completos = r ? (r.mes_em_andamento ? meses - 1 : meses) : 0
@@ -152,7 +154,7 @@ export default function Mix() {
       </PageHead>
       <div className="toolbar">
         <label className="field-inline">Ano <select className="select" value={ano} onChange={e => set({ ano: e.target.value })}>{[anoAtual(), anoAtual() - 1].map(a => <option key={a}>{a}</option>)}</select></label>
-        <label className="field-inline">Setor <select className="select" value={setor} onChange={e => set({ setor: e.target.value })}><option value="">Todos</option>{['Alimentação', 'Farmácia', 'Diversos', 'Não classificado'].map(s => <option key={s}>{s}</option>)}</select></label>
+        <SelectSetorComercial value={setorc} onChange={v => set({ setorc: v, setor: null })} />
         <Tabs<Metrica> label="Medir por" value={metrica} onChange={v => set({ metrica: v })} options={[{ id: 'qtd', label: 'Quantidade' }, { id: 'valor', label: 'Faturamento' }]} />
         <SearchBox value={busca} onChange={v => set({ busca: v })} placeholder="Produto ou fornecedor" />
       </div>
@@ -165,7 +167,7 @@ export default function Mix() {
             <Metric icon={<Award size={18} />} tone="gold" label="Bateram recorde" value={int(itens.filter(i => diag.get(i.id)?.recordeRecente).length)} detail="melhor mês do ano foi o último" />
           </div>
           <div style={{ margin: '6px 0 16px' }}>
-            <Tabs<Aba> abas label="Visão" value={aba} onChange={v => set({ aba: v })} options={[{ id: 'produtos', label: 'Produtos mês a mês' }, { id: 'fornecedores', label: 'Fornecedores mês a mês' }, { id: 'diagnostico', label: 'Diagnóstico do mix' }, { id: 'embalagens', label: `Troca de embalagem (${linhas.length})` }]} />
+            <Tabs<Aba> abas label="Visão" value={aba} onChange={v => set({ aba: v })} options={[{ id: 'produtos', label: 'Produtos mês a mês' }, { id: 'fornecedores', label: 'Fornecedores mês a mês' }, { id: 'setores', label: 'Setores mês a mês' }, { id: 'perda', label: 'Perda por volume' }, { id: 'diagnostico', label: 'Diagnóstico do mix' }, { id: 'embalagens', label: `Troca de embalagem (${linhas.length})` }]} />
           </div>
 
           {aba === 'produtos' && (itens.length ? <Matriz nome="Produto" meses={meses} completos={completos} metrica={metrica} ordenar={ordenar} setOrdenar={setOrdenar}
@@ -173,6 +175,9 @@ export default function Mix() {
 
           {aba === 'fornecedores' && <Matriz nome="Fornecedor" meses={meses} completos={completos} metrica={metrica} ordenar={ordenar} setOrdenar={setOrdenar}
             linhas={fornecedores.map(f => ({ chave: f.chave, nome: f.nome, sub: `${int(f.produtos)} produtos vendidos`, valores: f.valores, dez: f.dez }))} />}
+
+          {aba === 'setores' && <SetoresMes ano={ano} metrica={metrica} mesesFechados={completos} />}
+          {aba === 'perda' && <PerdaVolume ano={ano} />}
 
           {aba === 'diagnostico' && (
             <>

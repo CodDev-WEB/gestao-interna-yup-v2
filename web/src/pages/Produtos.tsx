@@ -5,12 +5,13 @@ import { brl, data, dec, int, pct } from '../format'
 import { SETORES, SITUACOES, situacao } from '../labels'
 import { ItemLink } from '../ProdutoPainel'
 import { type Col, DataTable, Empty, ErrorState, Loading, PageHead, SearchBox, Tabs, useParam, useTableState } from '../ui'
+import { SelectSetorComercial } from '../setoresComerciais'
 
 type Produto = {
   idmercadoriavariacao: number; descricao: string | null; codigobarras: string | null; setor: string; secao: string | null; situacao: string
   estoque_atual: number | string; valor_estoque: number | string | null; qtd_90d: number | string; faturamento_90d: number | string
   margem_90d_pct: number | string | null; ultima_venda: string | null; dias_sem_venda: number | null; cobertura_dias: number | string | null
-  ultimo_preco_compra: number | null; ultimo_fornecedor: string | null; ultima_compra: string | null; classe?: string
+  ultimo_preco_compra: number | null; ultimo_fornecedor: string | null; ultima_compra: string | null; classe?: string; setor_comercial?: string | null
 }
 type Declinio = { idmercadoriavariacao: number; descricao: string | null; qtd_3_meses_atras: number | string; qtd_2_meses_atras: number | string; qtd_mes_passado: number | string; variacao_pct: number | string | null; estoque_atual: number | string }
 
@@ -18,16 +19,17 @@ type Declinio = { idmercadoriavariacao: number; descricao: string | null; qtd_3_
 function Lista() {
   const [sit, setSit] = useParam('situacao')
   const [setor, setSetor] = useParam('setor')
+  const [setorc, setSetorc] = useParam('setorc')
   const [busca, setBusca] = useParam('busca')
   const [ncm, setNcm] = useParam('ncm')
   const t = useTableState('valor_estoque')
   const qs = new URLSearchParams({ limit: String(t.pageSize), offset: String((t.page - 1) * t.pageSize), ordem: t.sort, dir: t.dir })
-  if (sit) qs.set('situacao', sit); if (setor) qs.set('setor', setor); if (busca) qs.set('busca', busca); if (ncm) qs.set('ncm', ncm)
+  if (sit) qs.set('situacao', sit); if (setor) qs.set('setor', setor); if (setorc) qs.set('setorc', setorc); if (busca) qs.set('busca', busca); if (ncm) qs.set('ncm', ncm)
   const { data: p, error, loading, reload } = useApi<Page<Produto>>(`dash/produtos?${qs}`)
   const s = sit ? situacao(sit) : null
 
   const cols: Col<Produto>[] = [
-    { key: 'descricao', label: 'Produto', wrap: true, sort: true, render: r => <><ItemLink id={r.idmercadoriavariacao}>{r.descricao || `Variação ${r.idmercadoriavariacao}`}</ItemLink><small>{r.codigobarras || '—'} · {r.secao || 'sem seção'}</small></> },
+    { key: 'descricao', label: 'Produto', wrap: true, sort: true, render: r => <><ItemLink id={r.idmercadoriavariacao}>{r.descricao || `Variação ${r.idmercadoriavariacao}`}</ItemLink><small>{r.codigobarras || '—'} · {r.setor_comercial ?? r.secao ?? 'sem seção'}</small></> },
     { key: 'classe', label: 'Classe', render: r => <ClasseTag classe={r.classe} /> },
     { key: 'situacao', label: 'Situação', render: r => { const x = situacao(r.situacao); return <span className="tag"><i style={{ background: x.cor }} aria-hidden />{x.nome}</span> } },
     { key: 'estoque_atual', label: 'Estoque', right: true, sort: true, render: r => dec(r.estoque_atual) },
@@ -50,8 +52,9 @@ function Lista() {
         </div>
       </div>
       <div className="controls">
-        <select className="select" value={setor} onChange={e => setSetor(e.target.value)} aria-label="Setor">
-          <option value="">Todos os setores</option>
+        <SelectSetorComercial value={setorc} onChange={setSetorc} />
+        <select className="select" value={setor} onChange={e => setSetor(e.target.value)} aria-label="Setor pelo NCM">
+          <option value="">Todos os setores (NCM)</option>
           {[...SETORES, 'Não classificado'].map(x => <option key={x}>{x}</option>)}
         </select>
         <SearchBox value={busca} onChange={setBusca} placeholder="Nome, código interno ou código de barras" />

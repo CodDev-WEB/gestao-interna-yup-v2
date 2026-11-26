@@ -14,7 +14,7 @@ import RelatorioProduto from './RelatorioProduto'
 type Fonte = 'vendas' | 'compras' | 'devolucoes' | 'estoque' | 'validades'
 type Def = { id: string; nome: string }
 const GRUPOS: Record<string, string> = {
-  dia: 'Dia', semana: 'Semana', mes: 'Mês', ano: 'Ano', empresa: 'Loja (empresa)', item: 'Produto', setor: 'Setor', secao: 'Seção',
+  dia: 'Dia', semana: 'Semana', mes: 'Mês', ano: 'Ano', empresa: 'Loja (empresa)', item: 'Produto', setor: 'Setor (NCM)', setor_comercial: 'Setor comercial', secao: 'Seção',
   vendedora: 'Vendedora', cliente: 'Cliente', fornecedor: 'Fornecedor', documento: 'Documento (venda/nota)', faixa: 'Situação / faixa', lote: 'Lote',
 }
 const METRICAS: Record<string, { nome: string; tipo: Tipo }> = {
@@ -24,13 +24,13 @@ const METRICAS: Record<string, { nome: string; tipo: Tipo }> = {
   ticket: { nome: 'Ticket médio', tipo: 'moeda' }, clientes: { nome: 'Nº de clientes', tipo: 'inteiro' }, produtos: { nome: 'Nº de produtos', tipo: 'inteiro' },
 }
 const FONTES: Record<Fonte, { nome: string; desc: string; periodo: string | null; grupos: string[]; metricas: string[]; nomes?: Record<string, string>; filtros: string[] }> = {
-  vendas: { nome: 'Vendas', desc: 'Itens vendidos (saída a receber efetivada).', periodo: 'Data da venda', grupos: ['dia', 'semana', 'mes', 'ano', 'empresa', 'item', 'setor', 'secao', 'vendedora', 'cliente', 'documento'], metricas: ['qtd', 'bruto', 'desconto', 'liquido', 'custo', 'lucro', 'margem', 'documentos', 'itens', 'ticket', 'clientes', 'produtos'], nomes: { documentos: 'Nº de vendas' }, filtros: ['empresa', 'vendedora', 'cliente', 'setor', 'secao', 'produto'] },
-  devolucoes: { nome: 'Devoluções', desc: 'Itens devolvidos (modelo TM).', periodo: 'Data da devolução', grupos: ['dia', 'semana', 'mes', 'ano', 'empresa', 'item', 'setor', 'secao', 'vendedora', 'cliente', 'documento'], metricas: ['qtd', 'liquido', 'documentos', 'itens', 'clientes', 'produtos'], nomes: { liquido: 'Valor devolvido', documentos: 'Nº de devoluções' }, filtros: ['empresa', 'vendedora', 'cliente', 'setor', 'secao', 'produto'] },
-  compras: { nome: 'Compras (entradas)', desc: 'Itens das notas de entrada efetivadas.', periodo: 'Data da entrada', grupos: ['dia', 'semana', 'mes', 'ano', 'empresa', 'item', 'setor', 'secao', 'fornecedor', 'documento', 'lote'], metricas: ['qtd', 'liquido', 'documentos', 'itens', 'produtos'], nomes: { liquido: 'Valor comprado', documentos: 'Nº de notas', qtd: 'Unidades' }, filtros: ['empresa', 'fornecedor', 'setor', 'secao', 'produto'] },
-  estoque: { nome: 'Estoque atual', desc: 'Saldo de agora, a custo (sem período).', periodo: null, grupos: ['item', 'setor', 'secao', 'faixa'], metricas: ['qtd', 'custo', 'produtos'], nomes: { qtd: 'Unidades em estoque', custo: 'Valor em estoque (custo)', faixa: 'Situação' }, filtros: ['setor', 'secao', 'produto'] },
-  validades: { nome: 'Validades (disponível)', desc: 'Unidades disponíveis por lote e validade.', periodo: 'Data de validade', grupos: ['mes', 'empresa', 'item', 'setor', 'faixa', 'lote'], metricas: ['qtd', 'custo', 'produtos', 'itens'], nomes: { qtd: 'Unidades disponíveis', custo: 'Valor a custo', itens: 'Nº de lotes', mes: 'Mês de validade' }, filtros: ['empresa', 'setor', 'produto', 'faixa'] },
+  vendas: { nome: 'Vendas', desc: 'Itens vendidos (saída a receber efetivada).', periodo: 'Data da venda', grupos: ['dia', 'semana', 'mes', 'ano', 'empresa', 'item', 'setor_comercial', 'setor', 'secao', 'vendedora', 'cliente', 'documento'], metricas: ['qtd', 'bruto', 'desconto', 'liquido', 'custo', 'lucro', 'margem', 'documentos', 'itens', 'ticket', 'clientes', 'produtos'], nomes: { documentos: 'Nº de vendas' }, filtros: ['empresa', 'vendedora', 'cliente', 'setor_comercial', 'setor', 'secao', 'produto'] },
+  devolucoes: { nome: 'Devoluções', desc: 'Itens devolvidos (modelo TM).', periodo: 'Data da devolução', grupos: ['dia', 'semana', 'mes', 'ano', 'empresa', 'item', 'setor_comercial', 'setor', 'secao', 'vendedora', 'cliente', 'documento'], metricas: ['qtd', 'liquido', 'documentos', 'itens', 'clientes', 'produtos'], nomes: { liquido: 'Valor devolvido', documentos: 'Nº de devoluções' }, filtros: ['empresa', 'vendedora', 'cliente', 'setor_comercial', 'setor', 'secao', 'produto'] },
+  compras: { nome: 'Compras (entradas)', desc: 'Itens das notas de entrada efetivadas.', periodo: 'Data da entrada', grupos: ['dia', 'semana', 'mes', 'ano', 'empresa', 'item', 'setor_comercial', 'setor', 'secao', 'fornecedor', 'documento', 'lote'], metricas: ['qtd', 'liquido', 'documentos', 'itens', 'produtos'], nomes: { liquido: 'Valor comprado', documentos: 'Nº de notas', qtd: 'Unidades' }, filtros: ['empresa', 'fornecedor', 'setor_comercial', 'setor', 'secao', 'produto'] },
+  estoque: { nome: 'Estoque atual', desc: 'Saldo de agora, a custo (sem período).', periodo: null, grupos: ['item', 'setor_comercial', 'setor', 'secao', 'faixa'], metricas: ['qtd', 'custo', 'produtos'], nomes: { qtd: 'Unidades em estoque', custo: 'Valor em estoque (custo)', faixa: 'Situação' }, filtros: ['setor_comercial', 'setor', 'secao', 'produto'] },
+  validades: { nome: 'Validades (disponível)', desc: 'Unidades disponíveis por lote e validade.', periodo: 'Data de validade', grupos: ['mes', 'empresa', 'item', 'setor_comercial', 'setor', 'faixa', 'lote'], metricas: ['qtd', 'custo', 'produtos', 'itens'], nomes: { qtd: 'Unidades disponíveis', custo: 'Valor a custo', itens: 'Nº de lotes', mes: 'Mês de validade' }, filtros: ['empresa', 'setor_comercial', 'setor', 'produto', 'faixa'] },
 }
-const FILTROS: Record<string, string> = { empresa: 'Loja (código da empresa)', vendedora: 'Vendedora', cliente: 'Código do cliente', fornecedor: 'Código do fornecedor', setor: 'Setor', secao: 'Seção (parte do nome)', produto: 'Produto (nome ou código)', faixa: 'Faixa de validade' }
+const FILTROS: Record<string, string> = { empresa: 'Loja (código da empresa)', vendedora: 'Vendedora', cliente: 'Código do cliente', fornecedor: 'Código do fornecedor', setor_comercial: 'Setor comercial', setor: 'Setor (NCM)', secao: 'Seção (parte do nome)', produto: 'Produto (nome ou código)', faixa: 'Faixa de validade' }
 const SETORES = ['Alimentação', 'Farmácia', 'Diversos', 'Não classificado']
 const FAIXAS: Def[] = [{ id: 'vencido', nome: 'Vencido' }, { id: 'critico_7d', nome: 'Até 7 dias' }, { id: 'alto_30d', nome: 'Até 30 dias' }, { id: 'atencao_60d', nome: 'Até 60 dias' }, { id: 'monitorar_90d', nome: 'Até 90 dias' }, { id: 'normal', nome: 'Mais de 90 dias' }]
 
@@ -43,7 +43,8 @@ function colunasDoGrupo(g: string, f: Fonte): Coluna[] {
     case 'ano': return [{ chave: 'ano', titulo: 'Ano', tipo: 'texto' }]
     case 'empresa': return [{ chave: 'empresa', titulo: 'Loja', tipo: 'texto' }]
     case 'item': return [{ chave: 'codigo', titulo: 'Código', tipo: 'texto' }, { chave: 'produto', titulo: 'Produto', tipo: 'texto' }]
-    case 'setor': return [{ chave: 'setor', titulo: 'Setor', tipo: 'texto' }]
+    case 'setor': return [{ chave: 'setor', titulo: 'Setor (NCM)', tipo: 'texto' }]
+    case 'setor_comercial': return [{ chave: 'setor_comercial', titulo: 'Setor comercial', tipo: 'texto' }]
     case 'secao': return [{ chave: 'secao', titulo: 'Seção', tipo: 'texto' }]
     case 'vendedora': return [{ chave: 'codigo_vendedora', titulo: 'Cód. vendedora', tipo: 'texto' }, { chave: 'vendedora', titulo: 'Vendedora', tipo: 'texto' }]
     case 'cliente': return [{ chave: 'codigo_cliente', titulo: 'Cód. cliente', tipo: 'texto' }, { chave: 'cliente', titulo: 'Cliente', tipo: 'texto' }]
@@ -64,6 +65,7 @@ const MODELOS_PRONTOS: Modelo[] = [
   { nome: 'Vendas por vendedora no mês', qs: `fonte=vendas&g=vendedora&m=documentos,bruto,desconto,liquido,lucro,margem,ticket&ordem=liquido` },
   { nome: 'Produtos mais vendidos', qs: `fonte=vendas&g=item&m=qtd,liquido,lucro,margem,documentos&ordem=liquido&limite=100` },
   { nome: 'Vendas dia a dia', qs: `fonte=vendas&g=dia&m=documentos,liquido,lucro,ticket&ordem=dia&dir=asc` },
+  { nome: 'Vendas por setor comercial e mês', qs: `fonte=vendas&g=setor_comercial,mes&m=qtd,liquido,lucro,margem&ordem=mes&dir=asc` },
   { nome: 'Vendas por setor e seção', qs: `fonte=vendas&g=setor,secao&m=qtd,liquido,lucro,margem&ordem=liquido` },
   { nome: 'Melhores clientes', qs: `fonte=vendas&g=cliente&m=documentos,liquido,ticket&ordem=liquido&limite=100` },
   { nome: 'Compras por fornecedor', qs: `fonte=compras&g=fornecedor&m=documentos,qtd,liquido,produtos&ordem=liquido` },
@@ -96,6 +98,7 @@ function RelatorioLivre() {
   const [gerando, setGerando] = useState(false)
   const [config, setConfig] = useState('')
   const [modelos, setModelos] = useState<Modelo[]>(lerModelos)
+  const setoresC = useApi<{ nome: string }[]>(def.filtros.includes('setor_comercial') ? 'dash/setores-comerciais' : null)
   const vend = useApi<{ vendedoras: { id: number; nome: string }[] }>(def.filtros.includes('vendedora') ? `dash/vendedoras?de=${mais(hoje(), -365)}&ate=${hoje()}` : null)
 
   const params = useMemo(() => ({ fonte, de: def.periodo ? de : null, ate: def.periodo ? ate : null, grupos, metricas, filtros, ordem: ordem || undefined, dir, limite: Number(limite) || 1000 }),
@@ -202,7 +205,8 @@ function RelatorioLivre() {
           <div className="rel-filtros">
             {def.filtros.map(f => (
               <label key={f}>{FILTROS[f]}
-                {f === 'setor' ? <select className="select" value={filtros.setor ?? ''} onChange={e => set({ f_setor: e.target.value })}><option value="">Todos</option>{SETORES.map(s => <option key={s}>{s}</option>)}</select>
+                {f === 'setor_comercial' ? <select className="select" value={filtros.setor_comercial ?? ''} onChange={e => set({ f_setor_comercial: e.target.value })}><option value="">Todos</option>{(setoresC.data ?? []).map(x => <option key={x.nome}>{x.nome}</option>)}<option>Sem setor</option></select>
+                  : f === 'setor' ? <select className="select" value={filtros.setor ?? ''} onChange={e => set({ f_setor: e.target.value })}><option value="">Todos</option>{SETORES.map(s => <option key={s}>{s}</option>)}</select>
                   : f === 'faixa' ? <select className="select" value={filtros.faixa ?? ''} onChange={e => set({ f_faixa: e.target.value })}><option value="">Todas</option>{FAIXAS.map(x => <option key={x.id} value={x.id}>{x.nome}</option>)}</select>
                   : f === 'vendedora' ? <select className="select" value={filtros.vendedora ?? ''} onChange={e => set({ f_vendedora: e.target.value })}><option value="">Todas</option>{(vend.data?.vendedoras ?? []).map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}</select>
                   : <input className="input" inputMode={['empresa', 'cliente', 'fornecedor'].includes(f) ? 'numeric' : undefined} value={filtros[f] ?? ''} onChange={e => set({ [`f_${f}`]: ['empresa', 'cliente', 'fornecedor'].includes(f) ? e.target.value.replace(/\D/g, '') : e.target.value.slice(0, 60) })} placeholder={f === 'produto' ? 'ex.: dipirona ou 1234' : ''} />}
@@ -212,7 +216,7 @@ function RelatorioLivre() {
               <select className="select" value={ordem} onChange={e => set({ ordem: e.target.value })}>
                 <option value="">{fonte === 'validades' ? 'Validade (vence primeiro no topo)' : 'Automático'}</option>
                 {metricas.map(m => <option key={m} value={m}>{nomeMetrica(m)}</option>)}
-                {grupos.filter(g => ['dia', 'semana', 'mes', 'ano', 'empresa', 'setor', 'secao', 'faixa'].includes(g)).map(g => <option key={g} value={g}>{nomeGrupo(g)}</option>)}
+                {grupos.filter(g => ['dia', 'semana', 'mes', 'ano', 'empresa', 'setor', 'setor_comercial', 'secao', 'faixa'].includes(g)).map(g => <option key={g} value={g}>{nomeGrupo(g)}</option>)}
               </select>
             </label>
             <label>Sentido

@@ -9,9 +9,9 @@ const n = (v: unknown) => (v === null || v === undefined ? 0 : Number(v))
 const rel = (db: Supabase, p: Record<string, unknown>) => db.rpc<Rel>('relatorio', { p: { limite: 5000, ...p } })
 const fimDoMes = (ano: number, m: number) => new Date(Date.UTC(ano, m, 0)).toISOString().slice(0, 10)
 
-export async function mixAno(db: Supabase, ano: number, setor: string | null, hoje: string) {
+export async function mixAno(db: Supabase, ano: number, setor: string | null, hoje: string, setorComercial: string | null = null) {
   const ultimoMes = Number(hoje.slice(0, 4)) === ano ? Number(hoje.slice(5, 7)) : Number(hoje.slice(0, 4)) > ano ? 12 : 0
-  const filtros = setor ? { setor } : {}
+  const filtros = { ...(setor ? { setor } : {}), ...(setorComercial ? { setor_comercial: setorComercial } : {}) }
   const metricas = ['qtd', 'liquido', 'clientes', 'documentos']
   const meses = Array.from({ length: ultimoMes }, (_, i) => i + 1)
   const [porMes, dezAnterior, compras] = await Promise.all([
@@ -38,7 +38,7 @@ export async function mixAno(db: Supabase, ano: number, setor: string | null, ho
   const fi = (nome: string, id: number) => { const k = `${id}|${nome}`; if (!idxForn.has(k)) { idxForn.set(k, fornecedores.length); fornecedores.push(`${id}|${nome}`) } return idxForn.get(k)! }
   const corta = (a: number[], casas = 3) => a.slice(0, ultimoMes).map(x => Math.round(x * 10 ** casas) / 10 ** casas)
   return {
-    ano, setor, meses_com_dados: ultimoMes, mes_em_andamento: Number(hoje.slice(0, 4)) === ano ? ultimoMes : null, fornecedores,
+    ano, setor, setor_comercial: setorComercial, meses_com_dados: ultimoMes, mes_em_andamento: Number(hoje.slice(0, 4)) === ano ? ultimoMes : null, fornecedores,
     // [id, nome, índice do fornecedor, qtd por mês, valor por mês, clientes por mês, qtd dez. anterior, valor dez. anterior]
     itens: [...itens.values()].map(it => [it.id, it.nome, fi(forn.get(it.id)?.nome ?? 'Sem compra registrada', forn.get(it.id)?.id ?? 0), corta(it.qtd), corta(it.valor, 2), corta(it.clientes, 0), it.dez_qtd, Math.round(it.dez_valor * 100) / 100]),
   }

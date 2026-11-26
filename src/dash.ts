@@ -12,6 +12,13 @@ const SITUACOES = ['sem_saida_historica', 'parado', 'baixa_movimentacao', 'exces
 const FAIXAS = ['vencido', 'critico_7d', 'alto_30d', 'atencao_60d', 'monitorar_90d', 'normal']
 const SEGMENTOS = ['vip', 'recorrente', 'novo', 'em_risco', 'inativo', 'ocasional']
 const SETORES = ['Alimentação', 'Farmácia', 'Diversos']
+/** Setor comercial (classificação da loja, tabela cad_setor_comercial): só letras, números, espaço, "/", "-" e ".". */
+const setorc = (v: string | null) => (v && /^[\p{L}\p{N} /.-]{1,60}$/u.test(v.trim()) ? v.trim() : null)
+function faltaSetores(e: unknown) {
+  if (e instanceof SupabaseError && /cad_setor_comercial|perda_volume|conferencia_erp|setor_comercial|ref_relatorio_erp|PGRST202|PGRST205|42P01|42703/.test(e.message))
+    return new DashError('Os setores comerciais ainda não foram instalados no banco. Falta aplicar a migração 20261203000000_setores_comerciais.sql (cadastre SUPABASE_DB_URL no GitHub para isso ser automático, ou rode o arquivo no SQL Editor do Supabase).')
+  return e
+}
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/
 
@@ -215,13 +222,18 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       const sit = pick(q.get('situacao'), SITUACOES), setor = pick(q.get('setor'), [...SETORES, 'Não classificado']), s = busca(q.get('busca'))
       const ncm = q.get('ncm')
       const filtroNcm = ncm === 'sem' ? '&ncm=is.null' : ncm && /^\d{2,8}$/.test(ncm) ? `&ncm=like.${ncm}*` : ''
-      const filtro = (sit ? `&situacao=eq.${sit}` : '') + (setor ? `&setor=eq.${encodeURIComponent(setor)}` : '') + (s ? (/^\d{1,14}$/.test(s) ? `&or=(idmercadoriavariacao.eq.${s.length <= 9 ? s : -1},codigobarras.eq.${s})` : ilike('descricao', s)) : '') + filtroNcm
+      const sc = setorc(q.get('setorc'))
+      const filtro = (sit ? `&situacao=eq.${sit}` : '') + (setor ? `&setor=eq.${encodeURIComponent(setor)}` : '') + (sc ? `&setor_comercial=eq.${encodeURIComponent(sc)}` : '') + (s ? (/^\d{1,14}$/.test(s) ? `&or=(idmercadoriavariacao.eq.${s.length <= 9 ? s : -1},codigobarras.eq.${s})` : ilike('descricao', s)) : '') + filtroNcm
       const cols = ['valor_estoque', 'estoque_atual', 'dias_sem_venda', 'qtd_90d', 'faturamento_90d', 'lucro_90d', 'margem_90d_pct', 'cobertura_dias', 'descricao', 'ultima_venda']
       const consulta = `select=*${filtro}${order(q.get('ordem'), cols, 'valor_estoque', q.get('dir'))}`
       // Sem a migração do NCM instalada, cai para a view antiga (o filtro por NCM exige a nova).
-      const page = await db.selectPage<Record<string, unknown>>('vw_produto_ncm', consulta, limit, offset).catch(e => {
-        if (!filtroNcm && e instanceof SupabaseError && /vw_produto_ncm|PGRST205|42P01/.test(e.message)) return db.selectPage<Record<string, unknown>>('vw_produto_desempenho', consulta, limit, offset)
-        throw faltaMigracao(e)
+      // Com os setores comerciais instalados, lê a lista com o setor; sem eles, a view do NCM; sem ela, a antiga.
+      const page = await db.selectPage<Record<string, unknown>>('vw_produto_lista', consulta, limit, offset).catch(e => {
+        if (!sc && e instanceof SupabaseError && /vw_produto_lista|PGRST205|42P01/.test(e.message)) return db.selectPage<Record<string, unknown>>('vw_produto_ncm', consulta, limit, offset)
+        throw e
+      }).catch(e => {
+        if (!filtroNcm && !sc && e instanceof SupabaseError && /vw_produto_ncm|PGRST205|42P01/.test(e.message)) return db.selectPage<Record<string, unknown>>('vw_produto_desempenho', consulta, limit, offset)
+        throw sc ? faltaSetores(e) : faltaMigracao(e)
       })
       return { ...page, rows: await comClasse(db, await comUltimaCompra(db, page.rows)) }
     }
@@ -410,12 +422,36 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
     case 'mix': {
       const ano = int(q.get('ano'), Number(hojeBelem().slice(0, 4)), 2020, 2100)
       const setor = pick(q.get('setor'), [...SETORES, 'Não classificado'])
-      return mixAno(db, ano, setor, hojeBelem())
+      return mixAno(db, ano, setor, hojeBelem(), setorc(q.get('setorc'))).catch(e => { throw faltaSetores(e) })
     }
     case 'mix-familia': {
       const ids = (q.get('ids') ?? '').split(',').map(Number).filter(x => Number.isInteger(x) && x > 0)
       if (!ids.length) throw new DashError('Informe os itens da linha de produto.')
       return mixFamilia(db, ids, hojeBelem(), relatorioExato)
+    }
+
+    // ---------- Setores comerciais (classificação da loja) ----------
+    case 'setores-comerciais':
+      return db.select('cad_setor_comercial_lista', 'select=nome,ordem,mercadoria&order=ordem.asc,nome.asc').catch(e => { throw faltaSetores(e) })
+    // Setor x mês no ano: faturamento, lucro, margem e quantidade (base da aba Setores no Mix).
+    case 'setores-mes': {
+      const ano = int(q.get('ano'), Number(hojeBelem().slice(0, 4)), 2020, 2100)
+      return relatorioExato(db, { fonte: 'vendas', de: `${ano}-01-01`, ate: `${ano}-12-31`, grupos: ['setor_comercial', 'mes'], metricas: ['qtd', 'liquido', 'lucro', 'documentos'], limite: 5000 })
+        .catch(e => { throw faltaSetores(e) })
+    }
+    // Perda por volume: cada setor contra o seu mês de maior quantidade; produtos do setor escolhido com estoque e entradas.
+    case 'perda-volume': {
+      const mes = q.get('mes') && /^\d{4}-\d{2}$/.test(q.get('mes')!) ? `${q.get('mes')}-01` : null
+      return db.rpc('perda_volume', { p: { mes, setor: setorc(q.get('setor')) } }).catch(e => { throw faltaSetores(e) })
+    }
+    // Conferência com os totais do relatório do ERP (gabarito por mês).
+    case 'conferencia-erp':
+      return db.rpc('conferencia_erp', {}).catch(e => { throw faltaSetores(e) })
+    // Produtos vendidos no ano que ainda não têm setor comercial (para classificar).
+    case 'sem-setor': {
+      const ano = int(q.get('ano'), Number(hojeBelem().slice(0, 4)), 2020, 2100)
+      return relatorioExato(db, { fonte: 'vendas', de: `${ano}-01-01`, ate: `${ano}-12-31`, grupos: ['item'], metricas: ['liquido', 'qtd', 'documentos'], filtros: { setor_comercial: 'Sem setor' }, ordem: 'liquido', limite: 500 })
+        .catch(e => { throw faltaSetores(e) })
     }
 
     case 'meses':
@@ -541,6 +577,18 @@ export async function salvarSecao(db: Supabase, body: Record<string, unknown>) {
   }
   await atualizarClasse(db)
   return { ok: true }
+}
+
+/** Classifica um produto num setor comercial (ou tira a classificação, com setor null). Vale para todas as telas. */
+export async function salvarSetorComercial(db: Supabase, body: Record<string, unknown>, quem: string) {
+  const ids = (Array.isArray(body.ids) ? body.ids : [body.idmercadoriavariacao]).map(Number)
+  if (!ids.length || ids.length > 500 || !ids.every(id => Number.isSafeInteger(id) && id > 0)) throw new DashError('"ids" inválido (de 1 a 500 códigos de produto).')
+  if (body.setor === null) { await db.deleteWhere('cad_setor_comercial', `idmercadoriavariacao=in.(${ids.join(',')})`); return { ok: true, removidos: ids.length } }
+  const lista = await db.select<{ nome: string }>('cad_setor_comercial_lista', 'select=nome').catch(e => { throw faltaSetores(e) })
+  if (typeof body.setor !== 'string' || !lista.some(l => l.nome === body.setor)) throw new DashError(`"setor" precisa ser um de: ${lista.map(l => l.nome).join(', ')} (ou null).`)
+  const agora = new Date().toISOString()
+  await db.upsert('cad_setor_comercial', ids.map(id => ({ idmercadoriavariacao: id, setor: body.setor, origem: 'sistema', atualizado_em: agora, atualizado_por: quem.slice(0, 120) })), 'idmercadoriavariacao')
+  return { ok: true, salvos: ids.length }
 }
 
 /** Registra uma contagem física. O saldo do sistema e o custo são lidos aqui, no momento da contagem. */

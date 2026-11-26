@@ -6,6 +6,7 @@ import { CheckCircle2, RefreshCw, TriangleAlert } from 'lucide-react'
 import { api, useApi } from '../api'
 import { data as fmtData, haQuanto, mes as fmtMes } from '../format'
 import { Empty, ErrorState, Loading, PageHead, Tabs } from '../ui'
+import { ConferenciaErp } from '../setoresComerciais'
 
 type Campo = 'docs' | 'itens' | 'qtd' | 'valor' | 'bruto' | 'desconto'
 type T = Partial<Record<Campo, string>>
@@ -183,6 +184,10 @@ export default function Auditoria() {
           <p className="hint" style={{ marginTop: 16 }}>Critérios: venda = saída a receber efetivada (pré-venda PV, NFC-e 65 e NF-e 55); devolução = modelo TM, entrada a pagar efetivada; compra = entrada a pagar efetivada (NF-e 55, 1A). “Outros” são orçamentos/pedidos sem financeiro e documentos não efetivados: conferidos aqui, mas fora dos totais de venda e compra.</p>
         </>
       )}
+      <section className="section" aria-labelledby="conf-erp-h">
+        <div className="section-head"><h2 id="conf-erp-h">Conferência com o relatório do ERP</h2></div>
+        <ConferenciaErp />
+      </section>
     </>
   )
 }
