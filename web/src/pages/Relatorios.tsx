@@ -8,7 +8,8 @@ import { FileSpreadsheet, FileText, Play, Save, Trash2 } from 'lucide-react'
 import { api, useApi } from '../api'
 import { baixarExcel, baixarPdf, textoCelula, type Coluna, type Tipo } from '../exportar'
 import { ItemLink } from '../ProdutoPainel'
-import { Empty, ErrorState, Loading, PageHead } from '../ui'
+import { Empty, ErrorState, Loading, PageHead, Tabs } from '../ui'
+import RelatorioProduto from './RelatorioProduto'
 
 type Fonte = 'vendas' | 'compras' | 'devolucoes' | 'estoque' | 'validades'
 type Def = { id: string; nome: string }
@@ -76,7 +77,7 @@ function gravarModelos(m: Modelo[]) { try { localStorage.setItem(CHAVE_MODELOS, 
 
 type Resultado = { linhas: Record<string, unknown>[]; totais: Record<string, unknown>; total_linhas: number; limitado: boolean }
 
-export default function Relatorios() {
+function RelatorioLivre() {
   const [sp, setSp] = useSearchParams()
   const fonte = (FONTES[sp.get('fonte') as Fonte] ? sp.get('fonte') : 'vendas') as Fonte
   const def = FONTES[fonte]
@@ -139,9 +140,6 @@ export default function Relatorios() {
 
   return (
     <>
-      <PageHead section="Relatórios" title="Relatórios">
-        Monte o relatório do jeito que precisa: escolha de onde vêm os dados, o período, como agrupar, o que somar e os filtros. Gere na tela e baixe em Excel ou PDF. Os valores são os mesmos do resto do sistema, ao centavo.
-      </PageHead>
 
       <section className="rel-modelos" aria-label="Modelos">
         <span className="rel-rotulo">Começar de um modelo</span>
@@ -255,6 +253,23 @@ export default function Relatorios() {
           <p className="hint">Total calculado sobre todos os dados do filtro, mesmo quando a lista é cortada. Margem = lucro ÷ valor líquido; ticket = valor líquido ÷ nº de vendas.</p>
         </section>
       )}
+    </>
+  )
+}
+
+export default function Relatorios() {
+  const [sp, setSp] = useSearchParams()
+  const modo = sp.get('modo') === 'produto' ? 'produto' : 'livre'
+  return (
+    <>
+      <PageHead section="Relatórios" title="Relatórios">
+        Relatório livre: escolha de onde vêm os dados, o período, como agrupar, o que somar e os filtros. Relatório do produto: a ficha completa de um ou mais itens (ou de uma amostra sorteada), com as partes que você quiser — preços, compras, vendas, quem vendeu, log e linha do tempo. Tudo na tela e em Excel ou PDF, com os mesmos valores do resto do sistema.
+      </PageHead>
+      <div style={{ marginBottom: 18 }}>
+        <Tabs<'livre' | 'produto'> label="Tipo de relatório" value={modo} onChange={v => setSp(v === 'produto' ? new URLSearchParams({ modo: 'produto' }) : new URLSearchParams(), { replace: true })}
+          options={[{ id: 'livre', label: 'Relatório livre' }, { id: 'produto', label: 'Relatório do produto' }]} />
+      </div>
+      {modo === 'produto' ? <RelatorioProduto /> : <RelatorioLivre />}
     </>
   )
 }

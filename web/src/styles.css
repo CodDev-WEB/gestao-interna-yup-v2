@@ -799,3 +799,16 @@ h1, h2, h3 { text-wrap: balance; }
 /* Log de movimentações */
 .table-wrap td.col-op small { white-space: normal; max-width: 280px; }
 @media (max-width: 760px) { .field-inline .select { min-width: 0; width: 100%; } .field-inline { flex: 1 1 100%; } }
+
+/* Relatório do produto */
+.drawer-head-acoes { display: flex; align-items: center; gap: 8px; }
+.drawer-head-acoes .btn { text-decoration: none; }
+.rel-achados { display: grid; gap: 6px; margin: 8px 0 0; }
+.rel-achados .chip { text-align: left; }
+.rel-amostra { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); display: grid; gap: 10px; justify-items: start; }
+.rel-amostra .rel-filtros { width: 100%; }
+.rel-item { margin-top: 26px; padding-top: 18px; border-top: 2px solid var(--line-2); }
+.rel-item h2 { margin: 0 0 2px; font-size: 20px; }
+.rel-secao { margin-top: 18px; }
+.rel-secao h3 { margin: 0 0 8px; font-size: 14.5px; }
+.table-wrap td.wrap-texto { white-space: normal; min-width: 90px; }

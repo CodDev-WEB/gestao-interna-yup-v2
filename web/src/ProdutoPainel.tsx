@@ -2,11 +2,11 @@
 // então o link pode ser compartilhado e o botão Voltar do navegador fecha o painel.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import {
   AlertTriangle, ArrowDownRight, ArrowUpRight, Box, CalendarClock, CalendarX, ClipboardCheck, Copy, DollarSign, Flag,
-  History, PackagePlus, PencilLine, Receipt, RotateCcw, ShoppingCart, Tag, TrendingUp, Undo2, X,
+  FileText, History, PackagePlus, PencilLine, Receipt, RotateCcw, ShoppingCart, Tag, TrendingUp, Undo2, X,
 } from 'lucide-react'
 import { useApi } from './api'
 import { LogItem } from './LogMovimentos'
@@ -381,7 +381,10 @@ export default function ProdutoPainel() {
               {s && <span className="tag"><i style={{ background: s.cor }} aria-hidden />{s.nome}</span>}
             </p>}
           </div>
-          <button ref={fechar} type="button" className="drawer-close" onClick={close} aria-label="Fechar ficha"><X size={20} aria-hidden /></button>
+          <div className="drawer-head-acoes">
+            <Link className="btn secondary small" to={`/relatorios?modo=produto&itens=${valido}`} title="Relatório completo deste item em Excel ou PDF"><FileText size={15} aria-hidden />Relatório</Link>
+            <button ref={fechar} type="button" className="drawer-close" onClick={close} aria-label="Fechar ficha"><X size={20} aria-hidden /></button>
+          </div>
         </header>
 
         <div className="drawer-body">

@@ -354,6 +354,22 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
     case 'log-usuarios':
       return db.rpc('log_usuarios', {}).catch(() => [])
 
+    // Amostra aleatória de produtos para o relatório do produto.
+    case 'produtos-amostra': {
+      const n = int(q.get('n'), 5, 1, 50), situacao = pick(q.get('situacao'), SITUACOES), setor = pick(q.get('setor'), [...SETORES, 'Não classificado'])
+      try { return await db.rpc('produtos_amostra', { p_n: n, p_situacao: situacao, p_setor: setor }) }
+      catch (e) {
+        if (!(e instanceof SupabaseError && /PGRST202|produtos_amostra/.test(e.message))) throw e
+        // Sem a função no banco: sorteia posições e busca só código e nome de cada uma.
+        const filtro = (situacao ? `&situacao=eq.${situacao}` : '') + (setor ? `&setor=eq.${encodeURIComponent(setor)}` : '')
+        const total = await db.count('vw_produto_ncm', `select=idmercadoriavariacao${filtro}`)
+        const posicoes = new Set<number>()
+        while (posicoes.size < Math.min(n, total)) posicoes.add(Math.floor(Math.random() * total))
+        const rows = await Promise.all([...posicoes].map(o => db.select('vw_produto_ncm', `select=idmercadoriavariacao,descricao${filtro}&order=idmercadoriavariacao.asc&limit=1&offset=${o}`)))
+        return rows.flat()
+      }
+    }
+
     case 'meses':
       return db.select('vw_meses_movimento', 'select=mes,documentos&order=mes.desc').catch(() => [])
 
