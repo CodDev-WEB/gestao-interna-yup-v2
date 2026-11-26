@@ -517,6 +517,31 @@ await test('setores comerciais: relatório por setor soma o total; perda por vol
   }
 })
 
+await test('prevenção de perdas: troca na bipagem pareia sobra barata com falta cara; demais sinais respondem', async () => {
+  await sb.exec(`insert into erp_mercadoria_variacao (_idmercadoriavariacao, idmercadoria, idmarca) values (99901, 99901, 777), (99902, 99902, 777) on conflict do nothing`)
+  await sb.exec(`insert into erp_mercadoria_tabela_preco (_idempresa, _idmercadoriavariacao, _idtabela, valpreco) values (1, 99901, 1, 2), (1, 99902, 1, 10) on conflict do nothing`)
+  await sb.exec(`insert into cnt_contagem (idmercadoriavariacao, qtd_contada, qtd_sistema, contado_por) values (99901, 18, 10, 'teste'), (99902, 2, 10, 'teste')`)
+  try {
+    const trocas = (await sb.query<{ r: any }>(`select pp_trocas('{}'::jsonb) as r`)).rows[0].r
+    const par = trocas.find((t: any) => Number(t.id_barato) === 99901 && Number(t.id_caro) === 99902)
+    assert.ok(par, 'par sobra barata x falta cara')
+    assert.equal(Number(par.qtd_par), 8)
+    assert.equal(Number(par.valor), 64)
+    assert.equal(par.mesma_marca, true)
+    const p = JSON.stringify({ de: day(-400), ate: day(0) })
+    for (const f of ['pp_sem_saldo', 'pp_preco_abaixo', 'pp_saidas']) {
+      const r = (await sb.query<{ r: any }>(`select ${f}($1::jsonb) as r`, [p])).rows[0].r
+      assert.ok(r.total && Array.isArray(r.linhas ?? r.produtos), f)
+    }
+    const v = (await sb.query<{ r: any }>(`select pp_vendedoras($1::jsonb) as r`, [p])).rows[0].r
+    assert.ok(Array.isArray(v) && v.length > 0 && 'desconto_pct' in v[0])
+  } finally {
+    await sb.exec(`delete from cnt_contagem where contado_por = 'teste'`)
+    await sb.exec(`delete from erp_mercadoria_tabela_preco where _idmercadoriavariacao in (99901, 99902)`)
+    await sb.exec(`delete from erp_mercadoria_variacao where _idmercadoriavariacao in (99901, 99902)`)
+  }
+})
+
 await test('alinhamento: venda que chegou depois da leitura do saldo já baixa o estoque; preço e cancelamento também', async () => {
   await sb.exec(`insert into erp_mercadoria_estoque (_idempresa, _idlocalestoque, _idmercadoriavariacao, qtdsaldo, datahora) values (1, 1, 778, 10, now() - interval '2 hours')`)
   await sb.exec(`insert into erp_documento (_iddocumento, idempresa, datahora, tipomovimento, tipomovimentofinanceiro, status, modelo, sync_seen_at) values (9778, 1, now() - interval '1 hour', 'S', 'R', 'E', 'PV', now() - interval '50 minutes')`)

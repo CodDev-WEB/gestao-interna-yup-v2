@@ -1214,3 +1214,6 @@ body.carregando .content > * { opacity: 0.55; transition: opacity 0.15s ease-out
 .content > * { transition: opacity 0.15s ease-out; }
 @media print { .carregando-aviso { display: none !important; } }
 body.carregando .table-wrap[aria-busy='true'] { opacity: 1; }
+
+/* Prevenção de perdas: célula acima das colegas */
+.table-wrap tbody tr td.alerta, .table-wrap tbody tr:nth-child(even) td.alerta { background: var(--critical-soft); }

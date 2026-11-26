@@ -323,6 +323,27 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
         .sort((a, b) => b.liquido - a.liquido)
       return { mes, de: `${mes}-01`, ate, totais: r.totais, produtos }
     }
+    // Prevenção de perdas: troca na bipagem, venda sem saldo, preço abaixo da tabela, saída sem venda e o quadro por vendedora.
+    case 'prevencao': {
+      const fim = q.get('ate') && ISO.test(q.get('ate')!) ? q.get('ate')! : hojeBelem()
+      const dias = int(q.get('dias'), 30, 1, 120)
+      const p = { de: q.get('de') && ISO.test(q.get('de')!) ? q.get('de')! : addDays(fim, -(dias - 1)), ate: fim }
+      const falta = (e: unknown) => {
+        if (e instanceof SupabaseError && /pp_|PGRST202|vw_preco_tabela/.test(e.message)) return new DashError('A prevenção de perdas ainda não foi instalada no banco. Falta aplicar a migração 20261204000000_prevencao_perdas.sql (cadastre SUPABASE_DB_URL no GitHub para isso ser automático, ou rode o arquivo no SQL Editor do Supabase).')
+        return e
+      }
+      type PV = { id: number | null; vendedora: string; linhas: number; valor?: number; diferenca?: number }
+      type Bloco = { total: Record<string, number>; por_vendedora?: PV[]; linhas?: unknown[] }
+      const [vendedoras, semSaldo, precoAbaixo, saidas, trocas] = await Promise.all([
+        db.rpc<Record<string, unknown>[]>('pp_vendedoras', { p }), db.rpc<Bloco>('pp_sem_saldo', { p }), db.rpc<Bloco>('pp_preco_abaixo', { p }),
+        db.rpc<Record<string, unknown>>('pp_saidas', { p }), db.rpc<unknown[]>('pp_trocas', { p }),
+      ]).catch(e => { throw falta(e) })
+      const de = (b: Bloco, id: unknown) => b.por_vendedora?.find(x => (x.id ?? null) === (id ?? null))
+      const quadro = vendedoras.map(v => ({ ...v,
+        sem_saldo: de(semSaldo, v.id)?.linhas ?? 0, valor_sem_saldo: de(semSaldo, v.id)?.valor ?? 0,
+        abaixo_tabela: de(precoAbaixo, v.id)?.linhas ?? 0, diferenca_tabela: de(precoAbaixo, v.id)?.diferenca ?? 0 }))
+      return { periodo: p, vendedoras: quadro, sem_saldo: semSaldo, preco_abaixo: precoAbaixo, saidas, trocas }
+    }
     // O que a descoberta achou no ERP sobre caixa e formas de pagamento (base da conferência de caixa).
     case 'erp-caixa': {
       const [run] = await db.select<Record<string, unknown>>('sync_runs', 'dataset=eq.erp_caixa&select=started_at,details&order=started_at.desc&limit=1')
