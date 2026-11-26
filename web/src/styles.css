@@ -812,3 +812,21 @@ h1, h2, h3 { text-wrap: balance; }
 .rel-secao { margin-top: 18px; }
 .rel-secao h3 { margin: 0 0 8px; font-size: 14.5px; }
 .table-wrap td.wrap-texto { white-space: normal; min-width: 90px; }
+
+/* Mix e demanda */
+.matriz table { font-size: 12.5px; }
+.matriz td, .matriz th { padding-left: 8px; padding-right: 8px; }
+.matriz td.r small { display: block; font-size: 10.5px; }
+.matriz td.recorde { background: rgba(232, 179, 0, 0.12); font-weight: 700; }
+.matriz td.zero { color: var(--muted); }
+.matriz .estrela { color: #c99a00; fill: #e8b300; margin-left: 2px; vertical-align: -1px; }
+.matriz td.wrap { min-width: 220px; max-width: 320px; }
+.mix-lista { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }
+.mix-lista small { display: block; color: var(--muted); }
+.mix-linha { margin-bottom: 14px; }
+.mix-linha h3 { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.mix-causas { margin: 10px 0; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
+.mix-detalhe { margin-top: 12px; }
+.mix-detalhe h4 { margin: 0 0 8px; font-size: 13.5px; }
+.up { color: #1d8a4e; }
+.down { color: #c9302c; }

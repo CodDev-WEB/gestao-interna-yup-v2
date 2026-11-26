@@ -25,6 +25,7 @@ import Vendedoras from './pages/Vendedoras'
 import Auditoria from './pages/Auditoria'
 import Relatorios from './pages/Relatorios'
 import LogMovimentacoes from './pages/LogMovimentacoes'
+import Mix from './pages/Mix'
 
 import { GRUPOS, dentroDe, paginaAtual, type ItemNav } from './nav'
 
@@ -156,6 +157,7 @@ function App() {
           <Route path="/auditoria" element={<Auditoria />} />
           <Route path="/relatorios" element={<Relatorios />} />
           <Route path="/log" element={<LogMovimentacoes />} />
+          <Route path="/mix" element={<Mix />} />
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/validades" element={<Validades />} />
           <Route path="/fornecedores" element={<Fornecedores />} />

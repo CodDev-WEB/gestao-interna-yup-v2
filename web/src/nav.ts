@@ -1,5 +1,5 @@
 // Menu do sistema agrupado por assunto (usado no menu lateral, no celular e no título das páginas).
-import { BadgeCheck, History, CalendarClock, CalendarRange, ClipboardCheck, FileBarChart, IdCard, LayoutDashboard, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
+import { BadgeCheck, ChartColumn, History, CalendarClock, CalendarRange, ClipboardCheck, FileBarChart, IdCard, LayoutDashboard, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
 
 export const SUBABAS_SETORES = [
   { to: '/setores', label: 'Comparativo', end: true },
@@ -29,7 +29,7 @@ export const GRUPOS: Grupo[] = [
     { to: '/log', label: 'Log de movimentações', icon: History },
     { to: '/setores', label: 'Setores', icon: Shapes, filhos: SUBABAS_SETORES },
   ] },
-  { titulo: 'Análises', itens: [{ to: '/relatorios', label: 'Relatórios', icon: FileBarChart }] },
+  { titulo: 'Análises', itens: [{ to: '/mix', label: 'Mix e demanda', icon: ChartColumn }, { to: '/relatorios', label: 'Relatórios', icon: FileBarChart }] },
   { titulo: 'Controle dos dados', itens: [
     { to: '/auditoria', label: 'Auditoria de valores', icon: BadgeCheck },
     { to: '/qualidade', label: 'Qualidade do dado', icon: ShieldAlert },

@@ -17,7 +17,7 @@ import { auditarEGravar } from './auditoria'
 import { limparOutrasEmpresas } from './limpeza'
 
 const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data, null, 2), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
+  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } })
 
 // Compara os resumos SHA-256 (mesmo tamanho) em tempo constante, sem vazar tamanho nem conteúdo do token.
 async function sameSecret(a: string, b: string) {
@@ -96,7 +96,7 @@ function syncOptions(env: Env, extra: Partial<SyncOptions> & Pick<SyncOptions, '
 const configured = (env: Env) => Boolean(env.ERP_TOKEN && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY)
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  async fetch(req: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
     const route = `${req.method} ${url.pathname.replace(/\/+$/, '') || '/'}`
 
@@ -166,7 +166,16 @@ export default {
 
       // Dados do site.
       if (req.method === 'GET' && url.pathname.startsWith('/api/dash/')) {
-        try { return json(await dash(url.pathname.slice('/api/dash/'.length), url.searchParams, new Supabase(env))) }
+        const rota = url.pathname.slice('/api/dash/'.length)
+        // Mix e demanda junta o ano inteiro (vários segundos): fica pronto por 30 min no cache do Worker.
+        const cacheavel = rota === 'mix' || rota === 'mix-familia'
+        const chave = new Request(`https://cache.yup.internal/${rota}?${url.searchParams}`)
+        if (cacheavel && url.searchParams.get('novo') !== '1') { const c = await caches.default.match(chave).catch(() => undefined); if (c) return c }
+        try {
+          const resp = json(await dash(rota, url.searchParams, new Supabase(env)))
+          if (cacheavel) { const copia = new Response(resp.clone().body, resp); copia.headers.set('Cache-Control', 'max-age=1800'); ctx?.waitUntil(caches.default.put(chave, copia).catch(() => undefined)) }
+          return resp
+        }
         catch (e) { if (e instanceof DashError) throw new BadRequest(e.message); throw e }
       }
       if (route === 'POST /api/dash/ncm-regras') {

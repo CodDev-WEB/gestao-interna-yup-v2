@@ -4,6 +4,7 @@
 import { SupabaseError, type Supabase } from './supabase/client'
 import { produtoDetalhe } from './produto'
 import { clienteDetalhe, vendasCarregadasAte } from './cliente'
+import { mixAno, mixFamilia } from './mix'
 
 export class DashError extends Error {}
 
@@ -109,6 +110,41 @@ function amostra<T extends { posicao: number; classe: string }>(rows: T[], max =
   if (rows.length <= max) return rows
   const passo = rows.length / max
   return rows.filter((r, i) => i === 0 || i === rows.length - 1 || r.classe !== rows[i - 1].classe || Math.floor(i / passo) !== Math.floor((i - 1) / passo))
+}
+
+
+type RelResp = { linhas: Record<string, unknown>[]; totais: Record<string, unknown>; total_linhas?: number; limitado?: boolean }
+const SOMAVEIS = ['qtd', 'bruto', 'desconto', 'liquido', 'custo', 'lucro', 'documentos', 'itens', 'clientes', 'produtos']
+
+/**
+ * relatorio() com filtro de um item exato ({ item: código da variação }). O filtro "produto" do banco, com número,
+ * aceita o código da variação OU da mercadoria (números que se repetem entre produtos diferentes); aqui o resultado
+ * é agrupado também por item e só as linhas do item pedido ficam. Os totais são refeitos a partir dessas linhas.
+ */
+export async function relatorioExato(db: Supabase, p: Record<string, unknown>): Promise<RelResp> {
+  const item = Number(p.item)
+  if (!Number.isInteger(item) || item <= 0) return db.rpc<RelResp>('relatorio', { p })
+  const grupos = Array.isArray(p.grupos) ? (p.grupos as string[]).filter(g => g !== 'item') : []
+  if (grupos.length > 2) throw new DashError('Com um item escolhido, use no máximo 2 agrupamentos.')
+  const metricas = Array.isArray(p.metricas) && p.metricas.length ? (p.metricas as string[]) : ['liquido']
+  const base = { ...p, item: undefined, grupos: ['item', ...grupos], metricas: [...new Set([...metricas, 'liquido', 'lucro', 'documentos'])], filtros: { ...(p.filtros as object ?? {}), produto: String(item) }, limite: 5000 }
+  const r = await db.rpc<RelResp>('relatorio', { p: base })
+  const so = r.linhas.filter(l => Number(l.variacao) === item)
+  const extras = ['liquido', 'lucro', 'documentos'].filter(k => !metricas.includes(k))
+  const linhas = so.map(l => {
+    const o: Record<string, unknown> = { ...l }
+    if (!grupos.includes('lote')) for (const k of ['variacao', 'codigo', 'produto']) delete o[k]
+    for (const k of extras) delete o[k]
+    return o
+  })
+  const soma = (k: string) => so.reduce((a, l) => a + Math.round(Number(l[k] ?? 0) * 1000), 0) / 1000
+  const totais: Record<string, unknown> = {}
+  for (const m of metricas) if (SOMAVEIS.includes(m)) totais[m] = soma(m)
+  const liq = soma('liquido'), luc = soma('lucro'), docs = soma('documentos')
+  if (metricas.includes('margem')) totais.margem = liq ? Math.round(luc * 10000 / liq) / 100 : null
+  if (metricas.includes('ticket')) totais.ticket = docs ? Math.round(liq * 100 / docs) / 100 : null
+  if (metricas.includes('produtos')) totais.produtos = so.length ? 1 : 0
+  return { linhas: linhas.slice(0, Number(p.limite) || 5000), totais, total_linhas: linhas.length, limitado: r.limitado }
 }
 
 export async function dash(path: string, q: URLSearchParams, db: Supabase): Promise<unknown> {
@@ -329,7 +365,7 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       for (const k of ['de', 'ate']) if (p[k] != null && !ISO.test(String(p[k]))) throw new DashError('Data inválida no relatório.')
       try {
         // Custo e lucro vêm do custo médio (frações de centavo): arredonda ao centavo, como o resto do relatório.
-        const r = await db.rpc<{ linhas: Record<string, unknown>[]; totais: Record<string, unknown> }>('relatorio', { p })
+        const r = await relatorioExato(db, p)
         const cent = (o: Record<string, unknown>) => { for (const k of ['custo', 'lucro']) if (typeof o[k] === 'number') o[k] = Math.round((o[k] as number) * 100) / 100; return o }
         r.linhas.forEach(cent); if (r.totais) cent(r.totais)
         return r
@@ -368,6 +404,18 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
         const rows = await Promise.all([...posicoes].map(o => db.select('vw_produto_ncm', `select=idmercadoriavariacao,descricao${filtro}&order=idmercadoriavariacao.asc&limit=1&offset=${o}`)))
         return rows.flat()
       }
+    }
+
+    // Mix e demanda: cada produto mês a mês no ano (com fornecedor principal) e troca de embalagem numa linha de produto.
+    case 'mix': {
+      const ano = int(q.get('ano'), Number(hojeBelem().slice(0, 4)), 2020, 2100)
+      const setor = pick(q.get('setor'), [...SETORES, 'Não classificado'])
+      return mixAno(db, ano, setor, hojeBelem())
+    }
+    case 'mix-familia': {
+      const ids = (q.get('ids') ?? '').split(',').map(Number).filter(x => Number.isInteger(x) && x > 0)
+      if (!ids.length) throw new DashError('Informe os itens da linha de produto.')
+      return mixFamilia(db, ids, hojeBelem(), relatorioExato)
     }
 
     case 'meses':

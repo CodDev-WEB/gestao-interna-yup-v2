@@ -47,11 +47,16 @@ const SIT: Record<string, string> = { sem_saida_historica: 'Sem saída', parado:
 /** Monta as seções escolhidas de um item (tudo em formato de tabela, igual para tela, Excel e PDF). */
 async function montarItem(id: number, secoes: IdSecao[], de: string, ate: string): Promise<{ titulo: string; secoes: Secao[] }> {
   const quer = (s: IdSecao) => secoes.includes(s)
-  const rel = (p: Record<string, unknown>) => api<Rel>(`dash/relatorio?p=${encodeURIComponent(JSON.stringify({ fonte: 'vendas', de, ate, filtros: { produto: String(id) }, limite: 5000, ...p }))}`)
+  const rel = (p: Record<string, unknown>) => api<Rel>(`dash/relatorio?p=${encodeURIComponent(JSON.stringify({ fonte: 'vendas', de, ate, item: id, limite: 5000, ...p }))}`)
   const [f, porVend, cadaVenda, log] = await Promise.all([
     api<Ficha>(`dash/produto?id=${id}`),
     quer('vendedoras') ? rel({ grupos: ['vendedora'], metricas: ['documentos', 'qtd', 'bruto', 'desconto', 'liquido', 'lucro', 'margem'], ordem: 'liquido' }) : null,
-    quer('vendas') ? rel({ grupos: ['documento', 'cliente', 'vendedora'], metricas: ['qtd', 'liquido', 'lucro'] }) : null,
+    // Cada venda: documento + cliente e documento + vendedora (o filtro de item exato permite 2 agrupamentos), juntados pelo documento.
+    quer('vendas') ? Promise.all([rel({ grupos: ['documento', 'cliente'], metricas: ['qtd', 'liquido', 'lucro'] }), rel({ grupos: ['documento', 'vendedora'], metricas: ['qtd'] })]).then(([a, b]) => {
+      const vend = new Map<string, string[]>()
+      for (const l of b.linhas) vend.set(String(l.documento), [...(vend.get(String(l.documento)) ?? []), String(l.vendedora ?? '')])
+      return { ...a, linhas: a.linhas.map(l => ({ ...l, vendedora: [...new Set(vend.get(String(l.documento)) ?? [])].join(', ') }) as Record<string, unknown>) }
+    }) : null,
     quer('log') ? api<RespLog>(`dash/log?variacao=${id}&de=${de}&ate=${ate}&limit=500`) : null,
   ])
   const n = f.numeros, it = f.item
