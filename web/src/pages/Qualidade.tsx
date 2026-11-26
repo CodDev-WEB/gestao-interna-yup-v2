@@ -3,6 +3,7 @@ import { type Page, useApi } from '../api'
 import { brl, dec, int } from '../format'
 import { AvisoCarga, CLASSES, ClasseTag, PROBLEMAS, problema, type ResumoQualidade } from '../gestao'
 import { ItemLink } from '../ProdutoPainel'
+import { SemSetor } from '../setoresComerciais'
 import { type Col, DataTable, Empty, ErrorState, Loading, Metric, PageHead, SearchBox, useParam, useTableState } from '../ui'
 
 type Linha = {
@@ -67,6 +68,10 @@ export default function Qualidade() {
         <DataTable busy={loading} caption="Problemas de dado por item" cols={cols} rows={p.rows} total={p.total} page={t.page} pageSize={t.pageSize} onPage={t.onPage} onPageSize={t.onPageSize} sort={t.sort} dir={t.dir} onSort={t.onSort} rowKey={l => `${l.problema}-${l.idmercadoriavariacao}`} />
       )}
       <p className="hint" style={{ marginTop: 16 }}>As correções são feitas no ERP. O painel lê de novo a cada sincronização e o item sai desta lista sozinho.</p>
+      <section className="section" aria-labelledby="sem-setor-h">
+        <div className="section-head"><h2 id="sem-setor-h">Produtos sem setor comercial</h2></div>
+        <SemSetor ano={Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Belem' }).format(new Date()).slice(0, 4))} />
+      </section>
     </>
   )
 }

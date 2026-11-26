@@ -487,6 +487,36 @@ await test('relatório montado: agrupa, soma ao centavo, filtra e recusa o que n
   assert.ok(Array.isArray(busca.linhas))
 })
 
+await test('setores comerciais: relatório por setor soma o total; perda por volume fecha as contas; conferência com o ERP', async () => {
+  const rel = async (p: Record<string, unknown>) => (await sb.query<{ r: any }>('select relatorio($1) as r', [JSON.stringify(p)])).rows[0].r
+  const ini = day(-400), fim = day(0)
+  const vendidos = (await sb.query<{ id: string }>(`select distinct idmercadoriavariacao::text as id from vw_venda_item where data between '${ini}' and '${fim}' order by 1 limit 4`)).rows.map(r => Number(r.id))
+  assert.ok(vendidos.length > 0, 'precisa de vendas no teste')
+  await sb.exec(`insert into cad_setor_comercial (idmercadoriavariacao, setor, origem) values ${vendidos.map((id, i) => `(${id}, '${i % 2 ? 'Petiscos' : 'Rações / Alimentação'}', 'teste')`).join(', ')} on conflict (idmercadoriavariacao) do update set setor = excluded.setor`)
+  try {
+    const total = await rel({ fonte: 'vendas', de: ini, ate: fim, metricas: ['liquido'] })
+    const porSetor = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['setor_comercial'], metricas: ['liquido'] })
+    assert.equal(porSetor.linhas.reduce((a: bigint, l: any) => a + unidades(l.liquido, 2), 0n), unidades(total.totais.liquido, 2), 'setores somam o total')
+    assert.ok(porSetor.linhas.some((l: any) => l.setor_comercial === 'Rações / Alimentação'))
+    const filtrado = await rel({ fonte: 'vendas', de: ini, ate: fim, grupos: ['item'], metricas: ['liquido'], filtros: { setor_comercial: 'Petiscos' } })
+    assert.ok(filtrado.linhas.every((l: any) => vendidos.includes(Number(l.variacao))))
+    for (const fonte of ['compras', 'devolucoes', 'estoque', 'validades']) await rel({ fonte, de: day(-400), ate: day(400), grupos: ['setor_comercial'], metricas: ['qtd'] })
+    const pv = (await sb.query<{ r: any }>(`select perda_volume('{}'::jsonb) as r`)).rows[0].r
+    assert.ok(Array.isArray(pv.setores) && Array.isArray(pv.serie) && Array.isArray(pv.produtos))
+    for (const x of pv.setores) {
+      assert.ok(Math.abs(Number(x.impacto) - (Number(x.ganho) - Number(x.perda))) < 0.02, `impacto = ganho - perda (${x.setor})`)
+      assert.ok(Math.abs(Number(x.efeito_preco) - (Number(x.variacao) - Number(x.impacto))) < 0.02, `efeito = variação - impacto (${x.setor})`)
+      assert.ok(Number(x.perda) >= 0 && Number(x.ganho) >= 0)
+    }
+    const conf = (await sb.query<{ r: any }>('select conferencia_erp() as r')).rows[0].r
+    assert.equal(conf.length, 11)
+    assert.ok('faturamento' in conf[0].sistema && 'faturamento' in conf[0].erp)
+    assert.equal(Number(conf[0].erp.faturamento), 528272.6)
+  } finally {
+    await sb.exec(`delete from cad_setor_comercial where origem = 'teste'`)
+  }
+})
+
 await test('alinhamento: venda que chegou depois da leitura do saldo já baixa o estoque; preço e cancelamento também', async () => {
   await sb.exec(`insert into erp_mercadoria_estoque (_idempresa, _idlocalestoque, _idmercadoriavariacao, qtdsaldo, datahora) values (1, 1, 778, 10, now() - interval '2 hours')`)
   await sb.exec(`insert into erp_documento (_iddocumento, idempresa, datahora, tipomovimento, tipomovimentofinanceiro, status, modelo, sync_seen_at) values (9778, 1, now() - interval '1 hour', 'S', 'R', 'E', 'PV', now() - interval '50 minutes')`)

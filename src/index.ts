@@ -10,7 +10,7 @@ import { convertRow } from './sync/convert'
 import { buildCount, buildSelect } from './sync/sql'
 import { runSync, type SyncOptions } from './sync/engine'
 import { PostgrestStore } from './sync/store'
-import { dash, DashError, salvarContagem, salvarRegraNcm, salvarSecao } from './dash'
+import { dash, DashError, salvarContagem, salvarRegraNcm, salvarSecao, salvarSetorComercial } from './dash'
 import { diagnosticar, diagnosticarVarios, lerErro } from './sync/diagnostico'
 import { descobrirAuditoriaDocs, descobrirAutoria, descobrirColunas, descobrirUsuarios } from './erp/descoberta'
 import { auditarEGravar } from './auditoria'
@@ -184,6 +184,10 @@ export default {
       }
       if (route === 'POST /api/dash/contagem') {
         try { return json(await salvarContagem(new Supabase(env), await body(req), auth.who)) }
+        catch (e) { if (e instanceof DashError) throw new BadRequest(e.message); throw e }
+      }
+      if (route === 'POST /api/dash/setor-comercial') {
+        try { return json(await salvarSetorComercial(new Supabase(env), await body(req), auth.who)) }
         catch (e) { if (e instanceof DashError) throw new BadRequest(e.message); throw e }
       }
       if (route === 'POST /api/dash/secoes') {
