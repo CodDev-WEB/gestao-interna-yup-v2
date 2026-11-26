@@ -1,9 +1,9 @@
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowUp, PanelLeftClose, PanelLeftOpen, Search, BadgeCheck, FileBarChart, Menu as MenuIcon, X, CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, IdCard, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
+import { ArrowUp, LoaderCircle, PanelLeftClose, PanelLeftOpen, Search, BadgeCheck, FileBarChart, Menu as MenuIcon, X, CalendarClock, CalendarRange, ChevronRight, ClipboardCheck, IdCard, LayoutDashboard, LogOut, Package, RefreshCw, Shapes, ShieldAlert, ShoppingCart, Truck, Users } from 'lucide-react'
 import './styles.css'
-import { currentUser, logout, onAuthChange, useApi } from './api'
+import { currentUser, logout, onAuthChange, useApi, useCarregando } from './api'
 import { haQuanto } from './format'
 import { Brand } from './ui'
 import ProdutoPainel from './ProdutoPainel'
@@ -136,6 +136,24 @@ function BarraTopo({ user, menuMin, alternarMenu }: { user: string; menuMin: boo
   )
 }
 
+/** Aviso "Carregando…" com o círculo girando enquanto qualquer bloco da tela busca dados.
+ *  Só aparece se a busca passar de 150 ms (troca rápida não pisca) e esmaece o conteúdo antigo. */
+function Carregando() {
+  const n = useCarregando()
+  const [ver, setVer] = useState(false)
+  useEffect(() => {
+    if (n === 0) { setVer(false); return }
+    const t = setTimeout(() => setVer(true), 150)
+    return () => clearTimeout(t)
+  }, [n > 0]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { document.body.classList.toggle('carregando', ver) }, [ver])
+  return (
+    <div className="carregando-aviso" role="status" aria-live="polite" hidden={!ver}>
+      {ver && <><LoaderCircle size={16} className="spin" aria-hidden />Carregando…</>}
+    </div>
+  )
+}
+
 /** Volta ao topo quando a página fica longa. */
 function VoltarTopo() {
   const [ver, setVer] = useState(false)
@@ -201,6 +219,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      <Carregando />
       <BarraCelular user={user} />
       <VoltarTopo />
       {/* Ordem importa: a ficha do item abre por cima da do cliente (e da vendedora). */}
