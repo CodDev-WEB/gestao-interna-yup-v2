@@ -17,7 +17,7 @@ const carimbo = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Be
 function valorNumero(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null
   const n = typeof v === 'number' ? v : Number(v)
-  return Number.isFinite(n) ? n : null
+  return Number.isFinite(n) ? (Math.abs(n) < 0.005 ? 0 : n) : null
 }
 
 /** Texto para PDF/tela, no padrão brasileiro. */
