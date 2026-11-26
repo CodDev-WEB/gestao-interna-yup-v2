@@ -116,7 +116,7 @@ function Curva() {
       <section className="panel" aria-labelledby="pareto-h">
         <h2 id="pareto-h">{a ? `${pct(a.itens_pct, 0)} dos itens fazem 80% do faturamento` : 'Curva ABC'}</h2>
         <p>Itens ordenados do que mais vende para o que menos vende. A classe A recebe contagem mensal e nível de serviço de 98%; a B, 95%; a C, 90%.</p>
-        <div style={{ height: 300 }} role="img" aria-label={`Curva ABC: ${a ? `${int(a.itens)} itens da classe A fazem 80% do faturamento` : ''} de ${int(d.total)} itens vendidos.`}>
+        <div style={{ height: 260 }} role="img" aria-label={`Curva ABC: ${a ? `${int(a.itens)} itens da classe A fazem 80% do faturamento` : ''} de ${int(d.total)} itens vendidos.`}>
           <ResponsiveContainer>
             <AreaChart data={d.curva} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid stroke="var(--grid)" vertical={false} />

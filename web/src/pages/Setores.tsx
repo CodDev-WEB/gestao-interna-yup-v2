@@ -94,7 +94,7 @@ export default function Setores() {
         <>
           <section className="panel" aria-labelledby="g-h">
             <h2 id="g-h">Faturamento por setor e mês</h2>
-            <div style={{ height: 300, marginTop: 12 }}>
+            <div style={{ height: 260, marginTop: 8 }}>
               <ResponsiveContainer>
                 <BarChart data={grafico} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2} barCategoryGap="22%">
                   <CartesianGrid stroke="var(--grid)" vertical={false} />

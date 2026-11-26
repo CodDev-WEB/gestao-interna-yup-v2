@@ -1,11 +1,10 @@
-import { ExportarPagina } from '../Exportar'
 import { Link } from 'react-router-dom'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AlertTriangle, ArrowDownUp, CalendarX, ChevronRight, Hourglass, PackageMinus, Percent, Receipt, TrendingDown, TrendingUp, UserMinus, Wallet, Wrench } from 'lucide-react'
 import { useApi } from '../api'
 import { brl, brlCurto, data as fmtData, dataCurta, haQuanto, int, pct, variacao } from '../format'
 import { SITUACOES } from '../labels'
-import { ErrorState, Loading, Metric, Tabs, useParam } from '../ui'
+import { ErrorState, Loading, Metric, PageHead, Tabs, useParam } from '../ui'
 
 type Tot = { faturamento: number; lucro: number; vendas: number; devolucoes: number; sem_custo: number; margem: number | null; ticket: number | null }
 type Resumo = {
@@ -90,13 +89,9 @@ export default function Resumo() {
 
   return (
     <>
-      <section className="brief" aria-labelledby="brief-h">
-        <div className="brief-top">
-          <span className="brief-when">{saudacao()}. {hoje()}.</span>
-          <Tabs label="Período" value={dias} options={PERIODOS} onChange={setDias} />
-          <ExportarPagina titulo="Visão geral" />
-        </div>
-        <h1 id="brief-h" className="brief-text">
+      <PageHead title="Visão geral" actions={<><span className="brief-when">{saudacao()}. {hoje()}.</span><Tabs label="Período" value={dias} options={PERIODOS} onChange={setDias} /></>} />
+      <section className="brief" aria-label="Resumo do período">
+        <p className="brief-text">
           <span className="s">
             {incompleta && um
               ? <>Em <Link to={`/mes?mes=${um.mes}`}>{mesLongo(um.mes)}</Link>, o último mês com as vendas já carregadas, a Yup faturou {brl(Number(um.kpis.faturamento_liquido))} em {int(um.kpis.vendas)} vendas{um.kpis.margem_pct !== null && Number(um.kpis.lucro) !== 0 ? <>, com margem de {pct(um.kpis.margem_pct, 0)}</> : null}.</>
@@ -108,7 +103,7 @@ export default function Resumo() {
             Há <Link to="/produtos">{brl(totalCapital)}</Link> em estoque a custo{!semVendas && paradoOuExcesso > 0 ? <>, {pct(paradoOuExcesso / totalCapital * 100, 0)} dele parado ou em excesso</> : null}.
           </span>
           {principal && <span className="s">{principal.frase}</span>}
-        </h1>
+        </p>
         <p className="brief-src">
           Dados do ERP {r.sync.ultima_atualizacao ? `atualizados ${haQuanto(r.sync.ultima_atualizacao)}` : 'em carga'}.
           {incompleta ? <> Vendas carregadas até {ate ?? 'o início do histórico'}; a carga continua sozinha e as conclusões sobre estoque parado e validades aparecem quando ela chegar a hoje. <Link to="/sincronizacao">Ver progresso</Link>.</>
@@ -176,7 +171,7 @@ export default function Resumo() {
         <div className="panel-head">
           <div><h2 id="fat-h">Faturamento por dia</h2><p>{fmtData(r.periodo.inicio)} a {fmtData(r.periodo.fim)}, {int(a.vendas)} vendas, {brl(a.devolucoes)} em devoluções</p></div>
         </div>
-        {r.serie.every(d => d.faturamento === 0) ? <div className="state">{semVendas ? 'As vendas aparecem aqui assim que a carga do ERP chegar nelas.' : 'Nenhuma venda neste período.'}</div> : <div style={{ height: 280 }} role="img" aria-label={`Gráfico de área do faturamento diário de ${fmtData(r.periodo.inicio)} a ${fmtData(r.periodo.fim)}: total de ${brl(a.faturamento)}${pico ? `; maior dia ${fmtData(pico.data)}, com ${brl(pico.faturamento)}` : ''}.`}>
+        {r.serie.every(d => d.faturamento === 0) ? <div className="state">{semVendas ? 'As vendas aparecem aqui assim que a carga do ERP chegar nelas.' : 'Nenhuma venda neste período.'}</div> : <div style={{ height: 240 }} role="img" aria-label={`Gráfico de área do faturamento diário de ${fmtData(r.periodo.inicio)} a ${fmtData(r.periodo.fim)}: total de ${brl(a.faturamento)}${pico ? `; maior dia ${fmtData(pico.data)}, com ${brl(pico.faturamento)}` : ''}.`}>
           <ResponsiveContainer>
             <AreaChart data={r.serie} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs><linearGradient id="fat-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--turquoise)" stopOpacity={0.28} /><stop offset="100%" stopColor="var(--turquoise)" stopOpacity={0} /></linearGradient></defs>
