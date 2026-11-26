@@ -51,6 +51,17 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return b as T
 }
 
+// Quantas telas/blocos estão buscando dados agora (para o aviso "Carregando…" global).
+let emAndamento = 0
+const ouvintesCarga = new Set<(n: number) => void>()
+const mudarCarga = (d: number) => { emAndamento = Math.max(0, emAndamento + d); ouvintesCarga.forEach(f => f(emAndamento)) }
+/** Número de buscas em andamento; atualiza quando começa ou termina uma. */
+export function useCarregando() {
+  const [n, setN] = useState(emAndamento)
+  useEffect(() => { ouvintesCarga.add(setN); setN(emAndamento); return () => { ouvintesCarga.delete(setN) } }, [])
+  return n
+}
+
 /** Carrega dados de uma rota; recarrega quando a rota muda. */
 export function useApi<T>(path: string | null) {
   const [data, setData] = useState<T | null>(null)
@@ -59,10 +70,11 @@ export function useApi<T>(path: string | null) {
   const [tick, setTick] = useState(0)
   useEffect(() => {
     if (!path) return
-    let alive = true
-    setLoading(true); setError(null)
-    api<T>(path).then(d => { if (alive) setData(d) }).catch(e => { if (alive) setError(e.message) }).finally(() => { if (alive) setLoading(false) })
-    return () => { alive = false }
+    let alive = true, contado = true
+    setLoading(true); setError(null); mudarCarga(1)
+    const fim = () => { if (contado) { contado = false; mudarCarga(-1) } }
+    api<T>(path).then(d => { if (alive) setData(d) }).catch(e => { if (alive) setError(e.message) }).finally(() => { fim(); if (alive) setLoading(false) })
+    return () => { alive = false; fim() }
   }, [path, tick])
   const reload = useCallback(() => setTick(t => t + 1), [])
   return { data, error, loading, reload }

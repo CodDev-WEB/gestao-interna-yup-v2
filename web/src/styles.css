@@ -1204,3 +1204,13 @@ td.money { font-weight: 600; }
   html, body { font-size: 14px; }
   .input, .select, .topbar-busca .input { font-size: 16px; }
 }
+
+/* ---------- Carregando: aviso com círculo girando e conteúdo antigo esmaecido ---------- */
+.carregando-aviso { position: fixed; z-index: 45; top: calc(var(--topo-h, 0px) + 12px); left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 6px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 500; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); pointer-events: none; animation: fade 0.15s ease-out; }
+.carregando-aviso[hidden] { display: none; }
+@media (min-width: 761px) { .carregando-aviso { left: calc(var(--menu-w, 0px) + (100% - var(--menu-w, 0px)) / 2); } }
+@media (max-width: 760px) { .carregando-aviso { top: 64px; } }
+body.carregando .content > * { opacity: 0.55; transition: opacity 0.15s ease-out; }
+.content > * { transition: opacity 0.15s ease-out; }
+@media print { .carregando-aviso { display: none !important; } }
+body.carregando .table-wrap[aria-busy='true'] { opacity: 1; }
