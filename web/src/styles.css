@@ -933,7 +933,7 @@ h1, h2, h3 { text-wrap: balance; }
 html { scroll-padding-top: calc(var(--topo-h) + 8px); }
 .icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-2); flex: none; }
 .icon-btn:hover { background: rgba(0, 0, 0, 0.06); color: var(--ink); }
-.icon-btn[aria-expanded='true'] { color: var(--turquoise-ink); background: var(--turquoise-soft); }
+.icon-btn[aria-expanded='true'] { color: #076a73; background: var(--turquoise-soft); }
 .topbar { display: none; }
 .nav-atalho { display: none !important; }
 
@@ -1012,7 +1012,7 @@ html { scroll-padding-top: calc(var(--topo-h) + 8px); }
 .tabs button { min-height: 30px; padding: 0 12px; border-radius: 0; font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
 .tabs button + button { border-left: 1px solid var(--line); }
 .tabs button:hover { background: var(--paper); }
-.tabs button[aria-pressed='true'] { background: var(--turquoise-soft); color: var(--turquoise-ink); font-weight: 600; box-shadow: none; }
+.tabs button[aria-pressed='true'] { background: var(--turquoise-soft); color: #076a73; font-weight: 600; box-shadow: none; }
 
 /* Abas da tela: sublinhadas, numa linha só */
 .tabs.abas, .sub-tabs { display: flex; flex-wrap: wrap; gap: 0 22px; padding: 0; background: transparent; border: 0; border-bottom: 1px solid var(--line-2); border-radius: 0; overflow: visible; width: 100%; margin-bottom: 12px; }
