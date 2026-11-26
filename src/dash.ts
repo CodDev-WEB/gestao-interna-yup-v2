@@ -227,7 +227,11 @@ export async function dash(path: string, q: URLSearchParams, db: Supabase): Prom
       const cols = ['valor_estoque', 'estoque_atual', 'dias_sem_venda', 'qtd_90d', 'faturamento_90d', 'lucro_90d', 'margem_90d_pct', 'cobertura_dias', 'descricao', 'ultima_venda']
       const consulta = `select=*${filtro}${order(q.get('ordem'), cols, 'valor_estoque', q.get('dir'))}`
       // Sem a migração do NCM instalada, cai para a view antiga (o filtro por NCM exige a nova).
-      const page = await db.selectPage<Record<string, unknown>>('vw_produto_ncm', consulta, limit, offset).catch(e => {
+      // Com os setores comerciais instalados, lê a lista com o setor; sem eles, a view do NCM; sem ela, a antiga.
+      const page = await db.selectPage<Record<string, unknown>>('vw_produto_lista', consulta, limit, offset).catch(e => {
+        if (!sc && e instanceof SupabaseError && /vw_produto_lista|PGRST205|42P01/.test(e.message)) return db.selectPage<Record<string, unknown>>('vw_produto_ncm', consulta, limit, offset)
+        throw e
+      }).catch(e => {
         if (!filtroNcm && !sc && e instanceof SupabaseError && /vw_produto_ncm|PGRST205|42P01/.test(e.message)) return db.selectPage<Record<string, unknown>>('vw_produto_desempenho', consulta, limit, offset)
         throw sc ? faltaSetores(e) : faltaMigracao(e)
       })

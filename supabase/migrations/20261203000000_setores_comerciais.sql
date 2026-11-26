@@ -6803,10 +6803,8 @@ begin
   end if;
 end $$;
 
--- Produtos: o setor comercial vira coluna (filtro na lista de produtos e estoque). Só acrescenta a coluna no fim.
-create or replace view public.vw_produto_ncm with (security_invoker = true) as
-select d.*, pc.ncm, pc.ncm_descricao, pc.capitulo, pc.posicao, pc.subposicao, pc.origem_setor,
-       coalesce(scc.setor, 'Sem setor') as setor_comercial
-  from public.vw_produto_desempenho d
-  left join public.vw_produto_classe pc on pc.idmercadoriavariacao = d.idmercadoriavariacao
-  left join public.cad_setor_comercial scc on scc.idmercadoriavariacao = d.idmercadoriavariacao;
+-- Produtos: lista com o setor comercial (view própria, para não mexer em vw_produto_ncm, que outras migrações recriam).
+create or replace view public.vw_produto_lista with (security_invoker = true) as
+select n.*, coalesce(scc.setor, 'Sem setor') as setor_comercial
+  from public.vw_produto_ncm n
+  left join public.cad_setor_comercial scc on scc.idmercadoriavariacao = n.idmercadoriavariacao;
