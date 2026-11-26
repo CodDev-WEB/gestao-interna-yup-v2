@@ -165,7 +165,7 @@ export default function Mix() {
             <Metric icon={<Award size={18} />} tone="gold" label="Bateram recorde" value={int(itens.filter(i => diag.get(i.id)?.recordeRecente).length)} detail="melhor mês do ano foi o último" />
           </div>
           <div style={{ margin: '6px 0 16px' }}>
-            <Tabs<Aba> label="Visão" value={aba} onChange={v => set({ aba: v })} options={[{ id: 'produtos', label: 'Produtos mês a mês' }, { id: 'fornecedores', label: 'Fornecedores mês a mês' }, { id: 'diagnostico', label: 'Diagnóstico do mix' }, { id: 'embalagens', label: `Troca de embalagem (${linhas.length})` }]} />
+            <Tabs<Aba> abas label="Visão" value={aba} onChange={v => set({ aba: v })} options={[{ id: 'produtos', label: 'Produtos mês a mês' }, { id: 'fornecedores', label: 'Fornecedores mês a mês' }, { id: 'diagnostico', label: 'Diagnóstico do mix' }, { id: 'embalagens', label: `Troca de embalagem (${linhas.length})` }]} />
           </div>
 
           {aba === 'produtos' && (itens.length ? <Matriz nome="Produto" meses={meses} completos={completos} metrica={metrica} ordenar={ordenar} setOrdenar={setOrdenar}

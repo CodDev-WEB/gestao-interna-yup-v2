@@ -244,7 +244,7 @@ export default function ClientePainel() {
                 <Metric icon={<HeartPulse size={16} />} tone="purple" label="Ticket médio" value={brl(m.ticket_medio)} detail={`${int(m.compras)} compras, ${brl(m.total)} no total`} />
               </div>
               <div className="drawer-tabs">
-                <Tabs<Aba> label="Seções da ficha" value={aba} onChange={setAba} options={[
+                <Tabs<Aba> abas label="Seções da ficha" value={aba} onChange={setAba} options={[
                   { id: 'geral', label: 'Visão geral' },
                   { id: 'itens', label: `Itens${atrasados ? ` (${atrasados} atrasados)` : ''}` },
                   { id: 'meses', label: 'Mês a mês' },

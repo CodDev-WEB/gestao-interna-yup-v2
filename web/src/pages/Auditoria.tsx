@@ -146,7 +146,7 @@ export default function Auditoria() {
             </section>
           )}
 
-          <Tabs<Aba> label="Detalhe" value={aba} onChange={setAba} options={[
+          <Tabs<Aba> abas label="Detalhe" value={aba} onChange={setAba} options={[
             { id: 'diferencas', label: `Diferenças (${a.classes.filter(l => !l.ok).length})` },
             { id: 'meses', label: 'Vendas mês a mês' },
             { id: 'vendedoras', label: `Por vendedora (${a.vendedoras.filter(l => !l.ok).length})` },

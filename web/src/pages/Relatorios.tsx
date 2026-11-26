@@ -266,7 +266,7 @@ export default function Relatorios() {
         Relatório livre: escolha de onde vêm os dados, o período, como agrupar, o que somar e os filtros. Relatório do produto: a ficha completa de um ou mais itens (ou de uma amostra sorteada), com as partes que você quiser — preços, compras, vendas, quem vendeu, log e linha do tempo. Tudo na tela e em Excel ou PDF, com os mesmos valores do resto do sistema.
       </PageHead>
       <div style={{ marginBottom: 18 }}>
-        <Tabs<'livre' | 'produto'> label="Tipo de relatório" value={modo} onChange={v => setSp(v === 'produto' ? new URLSearchParams({ modo: 'produto' }) : new URLSearchParams(), { replace: true })}
+        <Tabs<'livre' | 'produto'> abas label="Tipo de relatório" value={modo} onChange={v => setSp(v === 'produto' ? new URLSearchParams({ modo: 'produto' }) : new URLSearchParams(), { replace: true })}
           options={[{ id: 'livre', label: 'Relatório livre' }, { id: 'produto', label: 'Relatório do produto' }]} />
       </div>
       {modo === 'produto' ? <RelatorioProduto /> : <RelatorioLivre />}

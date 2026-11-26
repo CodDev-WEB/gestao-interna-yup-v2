@@ -75,7 +75,7 @@ export default function Fornecedores() {
   return (
     <>
       <PageHead section="FORNECEDORES" title="Fornecedores"
-        actions={<Tabs label="Visão" value={ativa} onChange={setAba} options={[{ id: 'resumo', label: 'Quem fornece' }, { id: 'precos', label: 'Preços de compra' }]} />}>
+        tabs={<Tabs abas label="Visão" value={ativa} onChange={setAba} options={[{ id: 'resumo', label: 'Quem fornece' }, { id: 'precos', label: 'Preços de compra' }]} />}>
         Quanto a Yup compra de cada fornecedor e como os preços de compra estão variando.
       </PageHead>
       {ativa === 'precos' ? <Precos /> : <Resumo />}

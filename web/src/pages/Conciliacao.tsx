@@ -140,7 +140,7 @@ export default function Conciliacao() {
   return (
     <>
       <PageHead section="CONCILIAÇÃO" title="Conciliação do estoque"
-        actions={<Tabs label="Visão" value={aba} onChange={setAba} options={[{ id: 'contar', label: 'Contar hoje' }, { id: 'resultado', label: 'Acurácia' }]} />}>
+        tabs={<Tabs abas label="Visão" value={aba} onChange={setAba} options={[{ id: 'contar', label: 'Contar hoje' }, { id: 'resultado', label: 'Acurácia' }]} />}>
         Contagem cíclica pela curva ABC: uma parte dos itens por dia, sem parar a loja. O ajuste continua sendo feito no ERP; aqui fica o registro da contagem e a acurácia.
       </PageHead>
       {aba === 'resultado' ? <Resultado /> : <Contar />}

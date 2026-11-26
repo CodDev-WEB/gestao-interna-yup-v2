@@ -141,7 +141,7 @@ export default function Produtos() {
   return (
     <>
       <PageHead section="PRODUTOS" title="Produtos e estoque"
-        actions={<Tabs label="Visão" value={aba} onChange={setAba} options={[{ id: 'lista', label: 'Por situação' }, { id: 'abc', label: 'Curva ABC' }, { id: 'declinio', label: 'Em declínio' }]} />}>
+        tabs={<Tabs abas label="Visão" value={aba} onChange={setAba} options={[{ id: 'lista', label: 'Por situação' }, { id: 'abc', label: 'Curva ABC' }, { id: 'declinio', label: 'Em declínio' }]} />}>
         Cada variação com estoque, valor a custo, giro dos últimos 90 dias e a situação que pede ação.
       </PageHead>
       {aba === 'declinio' ? <Declinio /> : aba === 'abc' ? <Curva /> : <Lista />}
